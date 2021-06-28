@@ -1,0 +1,80 @@
+---
+title: "diagnostics_batch"
+output: html_document
+---
+
+```{r sourcce, message=FALSE, warning=FALSE}
+setwd(dirname(getwd()))
+source('paths.R', encoding="utf8" )
+source( file.path(post.dir, 'diagnostics.R'), encoding="utf8" )
+source( file.path(fit.dir, 'fit.R'), encoding="utf8" )
+source( file.path(dataprep.dir, 'dataprep.R'), encoding="utf8" )
+library(rstan)
+library(bridgesampling)
+library(ggplot2)
+```
+
+```{r read Models}
+lang.fam.names <- c( "full" )
+cVar <- "_5"
+trait.names <- c( "AN", "PN", "ND", "NG", "NNum", "VO", "NRc", "VS" )
+t.pairs <- c()
+
+for (trait.name.1 in trait.names){
+  for (trait.name.2 in trait.names){
+    pair = paste( trait.name.1, trait.name.2 )
+    
+    if ( (trait.name.1 != trait.name.2) & !(pair %in% t.pairs) ){
+      
+      t.pairs = c( t.pairs, pair, paste(trait.name.2, trait.name.1) )
+      
+      for ( i in 1:length(lang.fam.names) ){
+        
+        lang <- lang.fam.names[i]
+        
+        print( paste("--", trait.name.1, "-", trait.name.2, "-", lang, "--") )
+        
+        save.dir <- file.path( fit.dir, "fit", lang )
+        data.name <- paste( lang, "_" ,trait.name.1, "-", trait.name.2, sep="" )
+        
+        #cat("- lin \n")
+        file.name <- file.path( paste("cholesky-binom-lin_", data.name, "-0", sep="") )
+        fit.1 <- load.stanfit(save.dir, file.name, cVar=cVar)
+        rstan::check_hmc_diagnostics( fit.1 )
+        
+        cat("\n ----------- \n")
+        cat("- univ \n")
+        file.name <- file.path( paste("cholesky-binom-univ_", data.name, "-0", sep="") )
+        fit.2 <- load.stanfit(save.dir, file.name, cVar=cVar)
+        rstan::check_hmc_diagnostics( fit.2 )
+        
+        remove(fit.1, fit.2)
+        gc(verbose=FALSE)
+        cat("\n --------------------------------- \n")
+      }
+    }
+  }
+}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

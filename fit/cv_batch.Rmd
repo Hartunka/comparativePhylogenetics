@@ -1,0 +1,244 @@
+---
+title: "fit_batch_clean"
+output: html_document
+---
+
+```{r sourcce, message=FALSE, warning=FALSE}
+setwd(dirname(getwd()))
+source('paths.R', encoding="utf8" )
+source( file.path(post.dir, 'diagnostics.R'), encoding="utf8" )
+source( file.path(fit.dir, 'fit.R'), encoding="utf8" )
+source( file.path(dataprep.dir, 'dataprep.R'), encoding="utf8" )
+library(rstan)
+library(ggplot2)
+```
+
+## data:
+
+N : int, number of languages
+feats_lang : data.frame, feats of languages for current family
+trees.C : list, covariance matrices for language trees
+
+## features:
+
+- NA : noun adjective order
+    0: noun-adjective, 1:adjective-noun, -: other
+  rename to AN, to avoid naming conflict
+    
+- PN : adposition noun order
+    0: prepositions, 1: adpositions, -: other
+    
+- ND : noun demonstrative order
+    0: noun-demonstrative, 1: demonstrative-noun, -: other
+
+- NG : noun genetive order
+    0: noun-genetive, 1: genetive-noun, -: other
+
+- NNum : noun numeral order
+    0: noun-numeral, 1: numeral-noun, -: other
+
+- VO : verb object order
+    0: verb-object, 1:object-verb, -: other
+
+- NRc : noun relative clause order
+    0: noun-relative clause, 1: relative clause-noun, -: other
+
+- VS : verb subject order
+    0: verb-subject, 1: subject-verb, -: other
+```{r compile models}
+options(mc.cores = parallel::detectCores())
+memory.limit( size=30000 )
+chains <- 6
+max.C <- 5
+
+model.dep <- cmdstanr::cmdstan_model( 
+  file.path( models.dir, 'CV', 'TwoTraits-binom-multiC-cholesky-nonCentered-CV-fullEval.stan' ),
+  pedantic=TRUE)
+model.indep <- cmdstanr::cmdstan_model( 
+  file.path( models.dir, 'CV', 'TwoTraits-indep-binom-multiC-cholesky-nonCentered-CV-fullEval.stan' ),
+  pedantic=TRUE)
+```
+
+```{r fit Models}
+#lang.fam.names <- c( "Afro-Asiatic", "Algic", "Arawakan", "Athapaskan-Eyak-Tlingit", "Atlantic-Congo",
+#                    "Austroasiatic", "Austronesian", "Cariban", "Central_Sudanic", "Chibchan", 
+#                    "Dravidian", "Gunwinyguan", "Indo-European", "Mande", "Mongolic",  
+#                    "Nakh-Daghestanian", "Nilotic", "Nuclear_Torricelli", "Nuclear_Trans_New_Guinea", 
+#                    "Otomanguean", "Pama-Nyungan", "Pano-Tacanan", "Salishan", "Sepik", "Sino-Tibetan",
+#                    "Siouan", "Sko", "Surmic", "Tai-Kadai", "Tucanoan", "Tupian", "Turkic", "Uralic",
+#                    "Uto-Aztecan" )
+#lang.fam.names <- c( "Arawakan", "Chibchan", "Gunwinyguan", "Nilotic", 
+#                     "Pano-Tacanan", "Sko", "Surmic", "Tai-Kadai", "Tucanoan",
+#                     "Uralic" )
+lang.fam.names <- c( "Uto-Aztecan" )
+trait.names <- c( "AN", "PN", "ND", "NG", "NNum", "VO", "NRc", "VS" )
+t.pairs <- c()
+
+trait.pairs <- vector(mode="character", length=28)
+acc.dep <- vector(mode="numeric", length=28)
+acc.indep <- vector(mode="numeric", length=28)
+diff.1 <- vector(mode="numeric", length=28)
+diff.2 <- vector(mode="numeric", length=28)
+upper.50 <- vector(mode="logical", length=28)
+j <- 1
+
+for (trait.name.1 in trait.names){
+  for (trait.name.2 in trait.names){
+    pair = paste( trait.name.1, trait.name.2 )
+    
+    if ( (trait.name.1 != trait.name.2) & !(pair %in% t.pairs) ){
+      
+      t.pairs = c( t.pairs, pair, paste(trait.name.2, trait.name.1) )
+      
+      dep.mN = NA
+      indep.mN = NA
+      
+      for ( i in 1:length(lang.fam.names) ){
+        
+        lang <- lang.fam.names[i]
+        
+        dat <- get.data.3fold( lang.name=lang, trait.name.1=trait.name.1,
+                               trait.name.2=trait.name.2,
+                               M=max.C, seed.N=1, p.test=3,
+                               fullEval=TRUE )
+        dat.1 <- list(
+          N_train = dat$train.N,
+          N = dat$test.N,
+          x_train = dat$fold.1$train.traits,
+          x = dat$fold.1$test.traits,
+          unseen = dat$fold.1$unseen,
+          M = max.C,
+          C_train = dat$fold.1$train.C,
+          C = dat$fold.1$test.C,
+          dMat_train = designMatrix(dat$train.N,2),
+          dMat = designMatrix(dat$test.N,2),
+          # Hyperparameters
+          eta = 0.8,
+          lambda = 1,
+          mu_z = 0,
+          sigma_z = 1.5
+          )
+        dat.2 <- list(
+          N_train = dat$train.N,
+          N = dat$test.N,
+          x_train = dat$fold.2$train.traits,
+          x = dat$fold.2$test.traits,
+          unseen = dat$fold.2$unseen,
+          M = max.C,
+          C_train = dat$fold.2$train.C,
+          C = dat$fold.2$test.C,
+          dMat_train = designMatrix(dat$train.N,2),
+          dMat = designMatrix(dat$test.N,2),
+          # Hyperparameters
+          eta = 0.8,
+          lambda = 1,
+          mu_z = 0,
+          sigma_z = 1.5
+          )
+        dat.3 <- list(
+          N_train = dat$train.N,
+          N = dat$test.N,
+          x_train = dat$fold.3$train.traits,
+          x = dat$fold.3$test.traits,
+          unseen = dat$fold.3$unseen,
+          M = max.C,
+          C_train = dat$fold.3$train.C,
+          C = dat$fold.3$test.C,
+          dMat_train = designMatrix(dat$train.N,2),
+          dMat = designMatrix(dat$test.N,2),
+          # Hyperparameters
+          eta = 0.8,
+          lambda = 1,
+          mu_z = 0,
+          sigma_z = 1.5
+          )
+
+        print( paste("--", trait.name.1, "-", trait.name.2, "-", lang, "--") )
+        
+        print( "- dependent ")
+        dependent <- fit.CV.3f( model=model.dep, dat.1=dat.1, dat.2=dat.2, dat.3=dat.3, indep=FALSE, 
+                                lang=lang, trait.name.1=trait.name.1, trait.name.2=trait.name.2 )
+        print( "- independent ")
+        independent <- fit.CV.3f( model=model.indep, dat.1=dat.1, dat.2=dat.2, dat.3=dat.3, indep=TRUE, 
+                                  lang=lang, trait.name.1=trait.name.1, trait.name.2=trait.name.2 )
+        
+        trait.pairs[j] <- pair
+        acc.dep[j] <- dependent$acc
+        acc.indep[j] <- independent$acc
+        diff.1[j] <- dependent$acc - independent$acc
+        diff.2[j] <- independent$acc - dependent$acc
+        upper.50[j] <- (dependent$acc + independent$acc) > 1
+        j <- j+1
+      }
+    }
+  }
+}
+
+```
+```{r plot accuracies}
+unknowns <- dat$test.N - dat$train.N
+chance <- 0.5 ^ unknowns
+#chance <- 0.5
+acc.df.a <- data.frame( trait.pairs=as.factor(trait.pairs), accuracy=acc.dep, 
+                        model=rep("dependent", length(acc.dep)) )
+acc.df.b <- data.frame( trait.pairs=as.factor(trait.pairs), accuracy=acc.indep,
+                        model=rep("independent", length(acc.indep)) )
+acc.df <- rbind(acc.df.a, acc.df.b)
+
+ggplot(acc.df) + 
+  scale_y_continuous(
+    limits=c(NA, 1), breaks=seq(from=0, to=1, by=0.1)
+    ) +
+  geom_col(data=acc.df, aes(x=trait.pairs, y=accuracy, fill=model), position="dodge2") +
+  scale_fill_manual(values = c("green4", "blue4") ) +
+  geom_hline(yintercept=chance, color="red", size=1) +
+  coord_flip() + labs( title=lang )
+```
+
+```{r plot diffs}
+dAccdf <- data.frame(trait.pairs=as.factor(trait.pairs), dAccuracy=diff.1, upper.50=upper.50)
+pos <- dAccdf[dAccdf$dAccuracy>=0,]
+neg <- dAccdf[dAccdf$dAccuracy<0,]
+u.5 <- dAccdf[dAccdf$upper.50==TRUE,]
+
+ggplot(dAccdf) + 
+  geom_col(data=pos, aes(x=trait.pairs, y=dAccuracy), fill="green4") +
+  geom_col(data=neg, aes(x=trait.pairs, y=dAccuracy), fill="blue4") + 
+  geom_hline(yintercept=0, color="red", size=1.2) +
+  coord_flip() + labs( title=lang, subtitle="dependent over independent" )
+
+
+dAccdf.2 <- data.frame(trait.pairs=as.factor(trait.pairs), dAccuracy=diff.2)
+pos <- dAccdf.2[dAccdf.2$dAccuracy>=0,]
+neg <- dAccdf.2[dAccdf.2$dAccuracy<0,]
+u.5 <- dAccdf.2[dAccdf.2$upper.50==TRUE,]
+
+ggplot(dAccdf.2) + 
+  geom_col(data=pos, aes(x=trait.pairs, y=dAccuracy), fill="green4") +
+  geom_col(data=neg, aes(x=trait.pairs, y=dAccuracy), fill="blue4") + 
+  geom_hline(yintercept=0, color="red", size=1.2) +
+  coord_flip() + labs( title=lang, subtitle="independent over dependent" )
+```
+
+```{r}
+beepr::beep(8)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

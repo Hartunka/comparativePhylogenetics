@@ -1,0 +1,174 @@
+---
+title: "fit_batch_clean"
+output: html_document
+---
+
+```{r source, message=FALSE, warning=FALSE}
+setwd(dirname(getwd()))
+source('paths.R', encoding="utf8" )
+source( file.path(post.dir, 'diagnostics.R'), encoding="utf8" )
+source( file.path(fit.dir, 'fit.R'), encoding="utf8" )
+source( file.path(dataprep.dir, 'dataprep.R'), encoding="utf8" )
+library(rstan)
+library(bridgesampling)
+library(ggplot2)
+```
+
+
+```{r eval Models, paged.print=FALSE}
+#lang.fam.names <- c( "Afro-Asiatic", "Algic", "Arawakan", "Athapaskan-Eyak-Tlingit", "Atlantic-Congo",
+#                    "Austroasiatic", "Austronesian", "Cariban", "Central_Sudanic", "Chibchan", 
+#                    "Dravidian", "Gunwinyguan", "Indo-European", "Mande", "Mongolic",  
+#                    "Nakh-Daghestanian", "Nilotic", "Nuclear_Torricelli", "Nuclear_Trans_New_Guinea", 
+#                    "Otomanguean", "Pama-Nyungan", "Pano-Tacanan", "Salishan", "Sepik", "Sino-Tibetan",
+#                    "Siouan", "Sko", "Surmic", "Tai-Kadai", "Tucanoan", "Tupian", "Turkic", "Uralic",
+#                    "Uto-Aztecan" )
+lang.fam.names <- c("Uto-Aztecan") 
+#multi.C <- "_1-100"
+#multi.C <- "_5"
+multi.C <- ""
+trait.names <- c( "AN", "PN", "ND", "NG", "NNum", "VO", "NRc", "VS" )
+t.pairs <- c()
+
+trait.pairs <- vector(mode="character", length=28)
+values.looc.1 <- vector(mode="numeric", length=28)
+values.looc.2 <- vector(mode="numeric", length=28)
+values.waic.1 <- vector(mode="numeric", length=28)
+values.waic.2 <- vector(mode="numeric", length=28)
+wWaic.1 <- vector(mode="numeric", length=28)
+wWaic.2 <- vector(mode="numeric", length=28)
+j <- 1
+
+for (trait.name.1 in trait.names){
+  for (trait.name.2 in trait.names){
+    pair = paste( trait.name.1, trait.name.2 )
+    
+    if ( (trait.name.1 != trait.name.2) & !(pair %in% t.pairs) ){
+      
+      t.pairs = c( t.pairs, pair, paste(trait.name.2, trait.name.1) )
+      
+      for ( i in 1:length(lang.fam.names) ){
+        
+        lang <- lang.fam.names[i]
+
+        print( paste("--", trait.name.1, "-", trait.name.2, "-", lang, "--") )
+        
+        loo.1 <- get.LOOCs( lang.name=lang, 
+                                 trait.name.1=trait.name.1, trait.name.2=trait.name.2, 
+                                 variant="-dep_", multi.C=multi.C )
+        loo.2 <- get.LOOCs( lang.name=lang, 
+                                   trait.name.1=trait.name.1, trait.name.2=trait.name.2, 
+                                   variant="-indep_", multi.C=multi.C )
+        
+        looc <- loo::loo_compare( loo.1, loo.2)
+        looc.df <- as.data.frame( looc )
+        
+        if ( looc.df["model1","elpd_diff"] == looc.df[2,1] ){
+          value.looc.1 <- looc.df[2,1]
+          value.looc.2 <- - looc.df[2,1]
+        } else {
+          value.looc.1 <- - looc.df[2,1]
+          value.looc.2 <- looc.df[2,1]
+        }
+        print( looc )
+        
+        values.looc.1[j] <- value.looc.1
+        values.looc.2[j] <- value.looc.2
+        
+        waic <- get.WAICs( model.1.name="cholesky-binom-dep",
+                           model.2.name="cholesky-binom-indep",
+                           lang.name=lang, 
+                           trait.name.1=trait.name.1, trait.name.2=trait.name.2,
+                           multi.C=multi.C, dep="")
+        waic.df <- as.data.frame( waic )
+        print( waic )
+        
+        values.waic.1[j] <- waic.df["stanfit.1","WAIC"] - waic.df["stanfit.2","WAIC"]
+        values.waic.2[j] <- waic.df["stanfit.2","WAIC"] - waic.df["stanfit.1","WAIC"]
+        
+        wWaic.1[j] <- waic.df["stanfit.1","weight"]
+        wWaic.2[j] <- waic.df["stanfit.2","weight"]
+        
+        trait.pairs[j] <- pair
+        j <- j+1
+      }
+    }
+  }
+}
+
+```
+
+```{r plot dLooc}
+looc.df <- data.frame(trait.pairs=as.factor(trait.pairs), loocs=values.looc.1)
+pos <- looc.df[looc.df$loocs>=0,]
+neg <- looc.df[looc.df$loocs<0,]
+
+ggplot(looc.df) + 
+  geom_col(data=pos, aes(x=trait.pairs, y=loocs), fill="green4") +
+  geom_col(data=neg, aes(x=trait.pairs, y=loocs), fill="blue4") + 
+  geom_hline(yintercept=0, color="red", size=1.2) +
+  coord_flip() + 
+  labs( title=lang, subtitle="dependent over independent" ) + 
+  ylab( "looc - elpd_diff")
+
+
+looc.df.2 <- data.frame(trait.pairs=as.factor(trait.pairs), loocs=values.looc.2)
+pos <- looc.df.2[looc.df.2$loocs>=0,]
+neg <- looc.df.2[looc.df.2$loocs<0,]
+
+ggplot(looc.df.2) + 
+  geom_col(data=pos, aes(x=trait.pairs, y=loocs), fill="green4") +
+  geom_col(data=neg, aes(x=trait.pairs, y=loocs), fill="blue4") + 
+  geom_hline(yintercept=0, color="red", size=1.2) +
+  coord_flip() + 
+  labs( title=lang, subtitle="independent over dependent" ) + 
+  ylab( "looc - elpd_diff")
+```
+
+```{r plot dWaic}
+waic.df <- data.frame(trait.pairs=as.factor(trait.pairs), dWAIC=values.waic.1)
+pos <- waic.df[waic.df$dWAIC>=0,]
+neg <- waic.df[waic.df$dWAIC<0,]
+
+ggplot(waic.df) + 
+  geom_col(data=pos, aes(x=trait.pairs, y=dWAIC), fill="blue4") +
+  geom_col(data=neg, aes(x=trait.pairs, y=dWAIC), fill="green4") + 
+  geom_hline(yintercept=0, color="red", size=1.2) +
+  coord_flip() + 
+  labs( title=lang, subtitle="dependent over independent" )
+
+waic.df.2 <- data.frame(trait.pairs=as.factor(trait.pairs), dWAIC=values.waic.2)
+pos <- waic.df.2[waic.df.2$dWAIC>=0,]
+neg <- waic.df.2[waic.df.2$dWAIC<0,]
+
+ggplot(waic.df.2) + 
+  geom_col(data=pos, aes(x=trait.pairs, y=dWAIC), fill="blue4") +
+  geom_col(data=neg, aes(x=trait.pairs, y=dWAIC), fill="green4") + 
+  geom_hline(yintercept=0, color="red", size=1.2) +
+  coord_flip() + 
+  labs( title=lang, subtitle="independent over dependent" )
+```
+
+```{r WAIC weights}
+wWAIC.df.a <- data.frame( trait.pairs=as.factor(trait.pairs), WAIC.weight=wWaic.1, 
+                        model=rep("dependent", length(wWaic.1)) )
+wWAIC.df.b <- data.frame( trait.pairs=as.factor(trait.pairs), WAIC.weight=wWaic.2,
+                        model=rep("independent", length(wWaic.2)) )
+wWAIC.df <- rbind(wWAIC.df.a, wWAIC.df.b)
+
+ggplot(wWAIC.df) + 
+  geom_hline(yintercept=0.5, color="red", size=1) +
+  geom_col(data=wWAIC.df, aes(x=trait.pairs, y=WAIC.weight, fill=model), position="dodge2") +
+  scale_fill_manual(values = c("green4", "blue4") ) +
+  coord_flip(ylim=c(min(wWAIC.df$WAIC.weight),max(wWAIC.df$WAIC.weight))) + labs( title=lang )
+```
+
+```{r save}
+f_waic_df <- paste(lang, "_avgC-5_0_waicdf.RData", sep="")
+f_wWaic_df <- paste(lang, "_avgC-5_0_wWaicdf.RData", sep="")
+waic.F.dep.5.0.df <- waic.df
+waic.W.F.dep.5.0.df <- wWAIC.df
+save(waic.F.dep.5.0.df, file=file.path(post.dir, "rDats", f_waic_df))
+save(waic.W.F.dep.5.0.df, file=file.path(post.dir, "rDats", f_wWaic_df))
+```
+

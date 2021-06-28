@@ -1,0 +1,202 @@
+---
+title: "Dunn et al comparisons"
+output: html_document
+---
+
+```{r setup}
+library(ggplot2)
+library(ggpubr)
+setwd(dirname(getwd()))
+source('paths.R', encoding="utf8" )
+source( file.path(post.dir, 'diagnostics.R'), encoding="utf8" )
+```
+
+```{r load bfmats}
+load("rDats/Austronesian_avgC-5_0_bfmat.RData")
+load("rDats/Bantu_avgC-5_0_bfmat.RData")
+load("rDats/Indo-European_avgC-5_0_bfmat.RData")
+load("rDats/Uto-Aztecan_avgC-5_0_bfmat.RData")
+```
+
+# ------- qualitative comparisons to Dunn et al's results -------
+
+```{r Dunn weight mat}
+# from Dunn et al. (2011) supplentary information
+r.names <- c("AN", "VS", "ND", "NNum", "NRC", "NG", "VO", "PN")
+Dunn.AN.mat <- matrix(c(0,    -1.09, 5.53, 15.64, 5.33, 2.83, 1.21, 0.99,
+                   0, 0,     -3.69, -0.92, 3.23, 1.15, 3.93, 2.87,
+                   0, 0, 0,    -2.77, 3.28, -2.26, -2.53, -1.81,
+                   0, 0, 0, 0,    1.09, 18.26, 1.68, 7.26,
+                   0, 0, 0, 0, 0,    3.04, -1.01, -1.79,
+                   0, 0, 0, 0, 0, 0,    -0.88, 3.74,
+                   0, 0, 0, 0, 0, 0, 0,    15.34,
+                   0, 0, 0, 0, 0, 0, 0, 0), nrow=8, byrow=TRUE)
+
+Dunn.BA.mat <- matrix(c(0,    -0.64, 2.9, 3.99, -0.58, 0.0, 0.0, 0.0,
+                   0, 0,     -0.12, -0.72, 0.0, 0.0, 0.0, 0.0,
+                   0, 0, 0,    5.01, 0.0, 0.0, 0.0, 4.11,
+                   0, 0, 0, 0,    -0.89, 0.33, 0.0, 0.0,
+                   0, 0, 0, 0, 0,    0.0, 0.0, 0.0,
+                   0, 0, 0, 0, 0, 0,    0.0, 0.0,
+                   0, 0, 0, 0, 0, 0, 0,    0.0,
+                   0, 0, 0, 0, 0, 0, 0, 0), nrow=8, byrow=TRUE)
+
+Dunn.IE.mat <- matrix(c(0,    6.88, 7.64, 0.56, -0.25, 21.23, 1.43, 3.95,
+                   0, 0,     3, 0.42, -4.7, 5.14, 4.93, 3.39,
+                   0, 0, 0,    0.79, -3.86, 7.03, 7.55, 3.16,
+                   0, 0, 0, 0,    1.24, 1.66, -1.36, -0.6,
+                   0, 0, 0, 0, 0,    1.05, 1.56, 2.51,
+                   0, 0, 0, 0, 0, 0,    5.27, 13.65,
+                   0, 0, 0, 0, 0, 0, 0,    13.34,
+                   0, 0, 0, 0, 0, 0, 0, 0), nrow=8, byrow=TRUE)
+
+Dunn.UA.mat <- matrix(c(0,    1.97, 2.51, 1.49, 5.02, 3.04, 2.31, 2.78,
+                   0, 0,     2.26, 1.1, 0.34, 3.22, 13.57, 2.56,
+                   0, 0, 0,    0.09, 1.76, -0.54, -0.08, -1.13,
+                   0, 0, 0, 0,    -1.05, -2.68, 0.52, -1.41,
+                   0, 0, 0, 0, 0,    0.09, -1.52, -0.45,
+                   0, 0, 0, 0, 0, 0,    5.22, 3.21,
+                   0, 0, 0, 0, 0, 0, 0,    3.82,
+                   0, 0, 0, 0, 0, 0, 0, 0), nrow=8, byrow=TRUE)
+
+```
+
+```{r dunn plot, fig.height=6, fig.width=6}
+trait.names <- c( "AN", "PN", "ND", "NG", "NNum", "VO", "NRc", "VS" )
+dunn.order <- c("AN", "VS", "ND", "NNum", "NRc", "NG", "VO", "PN")
+
+# Austronesian
+dunn.plot(bf.mat.AN.5.0, threshold=1, log.scale=FALSE )
+dunn.plot(Dunn.AN.mat, threshold=5, log.scale=FALSE, comp.corr=bf.mat.AN.5.0 )
+( p.AN <- dunn.plot(bf.mat.AN.5.0, threshold=5, log.scale=FALSE, comp.corr=Dunn.AN.mat ) )
+
+# Bantu
+dunn.plot(bf.mat.BA.5.0, threshold=1, log.scale=FALSE )
+dunn.plot(Dunn.BA.mat, threshold=5, log.scale=FALSE, comp.corr=bf.mat.BA.5.0 )
+( p.BA <- dunn.plot(bf.mat.BA.5.0, threshold=5, log.scale=FALSE, comp.corr=Dunn.BA.mat ) )
+
+# Indo-European
+dunn.plot(bf.mat.IE.5.0, threshold=1, log.scale=FALSE )
+dunn.plot(Dunn.IE.mat, threshold=5, log.scale=FALSE, comp.corr=bf.mat.IE.5.0 )
+( p.IE <- dunn.plot(bf.mat.IE.5.0, threshold=5, log.scale=FALSE, comp.corr=Dunn.IE.mat ) )
+
+# Uto-Aztecan
+dunn.plot(bf.mat.UA.5.0, threshold=1, log.scale=FALSE )
+dunn.plot(Dunn.UA.mat, threshold=5, log.scale=FALSE, comp.corr=bf.mat.UA.5.0 )
+( p.UA <- dunn.plot(bf.mat.UA.5.0, threshold=5, log.scale=FALSE, comp.corr=Dunn.UA.mat ) )
+```
+
+```{r grid, fig.height=6, fig.width=24}
+Dunn.grid <- ggarrange(p.AN, p.BA, p.IE, p.UA,
+                   labels=c("Austronesian", "Bantu", "Indo-European", "Uto-Aztecan"),
+                   label.y=0.05,label.x=c(0.28, 0.41, 0.26, 0.34),
+                   #vjust=38, hjust=-1,
+                   nrow=1,
+                   font.label=list(size=18, face="plain") )
+# Figure 8:
+Dunn.grid
+```
+
+
+# ------- bayes factors for the four families -------
+
+```{r load dfs, fig.height=10, fig.width=18, paged.print=FALSE}
+# Austronesian
+load("rDats/Austronesian_avgC-5_0_bfdf.RData")
+bf.df.AN.5.0$dunn <- c(0.99, 5.53, 2.83, 15.64, 1.21, 5.33, -1.09, -1.81, 3.74, 
+                       7.26, 15.34, -1.79, 2.87, -2.26, -2.77, -2.53, 3.28, 
+                       -3.69, 18.26, -0.88, 3.04, 1.15, 1.68, 1.09, -0.92, 
+                       -1.01, 3.93, 3.23)
+
+# Bantu
+load("rDats/Bantu_avgC-5_0_bfdf.RData")
+bf.df.BA.5.0$dunn <- c(0, 2.9, 0, 3.99, 0, -0.58, -0.64, 4.11, 0, 0, 0, 0, 0, 0, 
+                       5.01, 0, 0, -0.12, 0.33, 0, 0, 0, 0, -0.89, -0.72, 0, 0, 0)
+
+# Indo-European
+load("rDats/Indo-European_avgC-5_0_bfdf.RData")
+bf.df.IE.5.0$dunn <- c(3.95, 7.64, 21.23, 0.56, 1.43, -0.25, 6.88, 3.16, 13.65, 
+                       -0.6, 13.34, 2.51, 3.39, 7.03, 0.79, 7.55, -3.86, 3, 1.66, 
+                       5.27, 1.05, 5.14, -1.36, 1.24, 0.42, 1.56, 4.93, -4.7)
+
+# Uto-Aztecan
+load("rDats/Uto-Aztecan_avgC-5_0_bfdf.RData")
+bf.df.UA.5.0$dunn <- c(2.78, 2.51, 3.04, 1.49, 2.31, 5.02, 1.97, -1.13, 3.21, 
+                       -1.41, 3.82, -0.45, 2.56, -0.54, 0.09, -0.08, 1.76, 2.26, 
+                       -2.68, 5.22, 0.09, 3.22, 0.52, -1.05, 1.1, -1.52, 13.57,
+                       0.34)
+```
+
+```{r bf2}
+bf.df.AN.5.0$bayes.factors.2 <- bf.df.AN.5.0$bayes.factors
+bf.df.AN.5.0$bayes.factors.2[bf.df.AN.5.0$bayes.factors.2<1] <- - 1 /
+                                                  bf.df.AN.5.0$bayes.factors.2[bf.df.AN.5.0$bayes.factors.2<1]
+bf.df.BA.5.0$bayes.factors.2 <- bf.df.BA.5.0$bayes.factors
+bf.df.BA.5.0$bayes.factors.2[bf.df.BA.5.0$bayes.factors.2<1] <- - 1 /
+                                                  bf.df.BA.5.0$bayes.factors.2[bf.df.BA.5.0$bayes.factors.2<1]
+bf.df.IE.5.0$bayes.factors.2 <- bf.df.IE.5.0$bayes.factors
+bf.df.IE.5.0$bayes.factors.2[bf.df.IE.5.0$bayes.factors.2<1] <- - 1 /
+                                                  bf.df.IE.5.0$bayes.factors.2[bf.df.IE.5.0$bayes.factors.2<1]
+bf.df.UA.5.0$bayes.factors.2 <- bf.df.UA.5.0$bayes.factors
+bf.df.UA.5.0$bayes.factors.2[bf.df.UA.5.0$bayes.factors.2<1] <- - 1 /
+                                                  bf.df.UA.5.0$bayes.factors.2[bf.df.UA.5.0$bayes.factors.2<1]
+```
+
+
+# ------- scatterplots for general comparison -------
+
+```{r scatter, fig.height=4, fig.width=16}
+p.AN.1 <- ggplot(bf.df.AN.5.0) + 
+  geom_abline(intercept=0, slope=1, color="grey", lwd=2) + 
+  geom_point(mapping=aes(x=dunn, y=bayes.factors), color="red") +
+  geom_smooth(mapping=aes(x=dunn, y=bayes.factors), method=lm, color="red", se=FALSE) + 
+  labs( title="Austronesian" ) + xlab("Bayes Factor (Dunn)") + ylab("Bayes Factors") + 
+  theme(text = element_text(size = 14))
+p.AN.2 <- p.AN.1 + scale_y_continuous(trans="pseudo_log", name="Bayes Factor - pseudo_log",
+                                      breaks=c(1, 100, 1e4, 3e9), labels=c("1", "100", "1e4", "3e9") )
+p.AN.3 <- p.AN.2 + scale_x_continuous(trans="pseudo_log", name="Bayes Factor (Dunn) - pseudo_log",
+                                      breaks=c(-5, -1, 1, 5, 10, 20))
+
+p.BA.1 <- ggplot(bf.df.BA.5.0) + 
+  geom_abline(intercept=0, slope=1, color="grey", lwd=2) + 
+  geom_point(data=bf.df.BA.5.0, mapping=aes(x=dunn, y=bayes.factors), color="green") +
+  geom_smooth(data=bf.df.BA.5.0, mapping=aes(x=dunn, y=bayes.factors), method=lm, color="green4", se=FALSE) + 
+  labs( title="Bantu" ) + xlab("Bayes Factor (Dunn)") + ylab("Bayes Factors") + 
+  theme(text = element_text(size = 14), axis.title.y=element_blank())
+p.BA.2 <- p.BA.1 + scale_y_continuous(trans="pseudo_log", name="Bayes Factor - pseudo_log")
+p.BA.3 <- p.BA.2 + scale_x_continuous(trans="pseudo_log", name="Bayes Factor (Dunn) - pseudo_log")
+
+p.IE.1 <- ggplot(bf.df.IE.5.0) + 
+  geom_abline(intercept=0, slope=1, color="grey", lwd=2) + 
+  geom_point(data=bf.df.IE.5.0, mapping=aes(x=dunn, y=bayes.factors), color="blue") +
+  geom_smooth(data=bf.df.IE.5.0, mapping=aes(x=dunn, y=bayes.factors), method=lm, color="blue", se=FALSE) + 
+  labs( title="Indo-European" ) + xlab("Bayes Factor (Dunn)") + ylab("Bayes Factors") + 
+  theme(text = element_text(size = 14), axis.title.y=element_blank())
+p.IE.2 <- p.IE.1 + scale_y_continuous(trans="pseudo_log", name="Bayes Factor - pseudo_log",
+                                      breaks=c(1, 5, 10, 20))
+p.IE.3 <- p.IE.2 + scale_x_continuous(trans="pseudo_log", name="Bayes Factor (Dunn) - pseudo_log",
+                                      breaks=c(-5, -1, 1, 5, 10, 20))
+
+p.UA.1 <- ggplot(bf.df.UA.5.0) + 
+  geom_abline(intercept=0, slope=1, color="grey", lwd=2) + 
+  geom_point(data=bf.df.UA.5.0, mapping=aes(x=dunn, y=bayes.factors), color="purple") +
+  geom_smooth(data=bf.df.UA.5.0, mapping=aes(x=dunn, y=bayes.factors), method=lm, color="purple", se=FALSE) + 
+  labs( title="Uto-Aztecan" ) + xlab("Bayes Factor (Dunn)") + ylab("Bayes Factors") +
+  theme(text = element_text(size = 14), axis.title.y=element_blank())
+p.UA.2 <- p.UA.1 + scale_y_continuous(trans="pseudo_log", name="Bayes Factor - pseudo_log",
+                                      breaks=c(1, 10, 100, 1e3), labels=c("1", "10", "100", "1000"))
+p.UA.3 <- p.UA.2 + scale_x_continuous(trans="pseudo_log", name="Bayes Factor (Dunn) - pseudo_log",
+                                      breaks=c(-5, -1, 1, 5, 10, 20))
+
+# Figure 9a:
+ggarrange(p.AN.1, p.BA.1, p.IE.1, p.UA.1, ncol=4, widths=c(1, 0.95, 0.95, 0.95))
+ggarrange(p.AN.2, p.BA.2, p.IE.2, p.UA.2, ncol=4, widths=c(1, 0.95, 0.95, 0.95))
+# Figure 9b:
+ggarrange(p.AN.3, p.BA.3, p.IE.3, p.UA.3, ncol=4, widths=c(1, 0.95, 0.95, 0.95))
+```
+
+
+
+
+
+

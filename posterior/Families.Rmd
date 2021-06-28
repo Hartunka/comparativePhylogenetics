@@ -1,0 +1,713 @@
+---
+title: "Famliy sprecific results"
+output: html_document
+---
+
+```{r setup}
+library(ggplot2)
+library(ggpubr)
+setwd(dirname(getwd()))
+source('paths.R', encoding="utf8" )
+source( file.path(post.dir, 'diagnostics.R'), encoding="utf8" )
+```
+
+
+```{r names}
+dunn.fam.names <- c( "Austronesian", "Bantu", "Indo-European", "Uto-Aztecan" )
+lang.fam.names <- c( "Afro-Asiatic", "Algic", "Arawakan", "Athapaskan-Eyak-Tlingit", "Atlantic-Congo",
+                    "Austroasiatic", "Cariban", "Central_Sudanic", "Chibchan", "Dravidian", "Gunwinyguan", 
+                    "Mande", "Mongolic", "Nakh-Daghestanian", "Nilotic", "Nuclear_Torricelli", "Nuclear_Trans_New_Guinea", 
+                    "Otomanguean", "Pama-Nyungan", "Pano-Tacanan", "Salishan", "Sepik", "Sino-Tibetan",
+                    "Siouan", "Sko", "Surmic", "Tai-Kadai", "Tucanoan", "Tupian", "Turkic", "Uralic" )
+trait.pairs <- c(
+  "AN PN", "AN ND", "AN NG", "AN NNum", "AN VO", "AN NRc", "AN VS", "PN ND", "PN NG", "PN NNum", "PN VO", "PN NRc", "PN VS", 
+  "ND NG", "ND NNum", "ND VO", "ND NRc", "ND VS", "NG NNum", "NG VO", "NG NRc", "NG VS", "NNum VO", "NNum NRc", "NNum VS", 
+  "VO NRc", "VO VS", "NRc VS" 
+  )
+```
+
+# ======== collect and plot for all families ======== 
+
+```{r data frames, paged.print=FALSE}
+trait.corr <- data.frame(trait.pairs)
+trait.corr$bf_count <- rep(0, 28)
+trait.corr$looc_count <- rep(0, 28)
+trait.corr$waic_count <- rep(0, 28)
+trait.corr$wWaic_count <- rep(0, 28)
+trait.corr$bfVlooc <- rep(0, 28)
+trait.corr$bfVwaic <- rep(0, 28)
+trait.corr$bfVwWaic <- rep(0, 28)
+trait.corr$loocVwaic <- rep(0, 28)
+
+families <- data.frame(trait.pairs="", bayes.factors=0, loocs=0, waics=0, wWaics=0, 
+                       unif.1=0, unif.2=0, unif.1.p=0, unif.2.p=0, N=0, C.depth=0, names="")
+head(families)
+```
+
+```{r Collecting}
+plots <- list()
+# ---- Families ----
+for ( i in 1:length(lang.fam.names) ){
+  
+  lang <- lang.fam.names[i]
+  
+  f_df <- paste("rDats/", lang, "_avgC-5_0_bfdf.RData", sep="")
+  f_mat <- paste("rDats/", lang, "_avgC-5_0_bfmat.RData", sep="")
+  f_looc <- paste("rDats/", lang, "_avgC-5_0_loocdf.RData", sep="")
+  f_waic <- paste("rDats/", lang, "_avgC-5_0_waicdf.RData", sep="")
+  f_wWaic <- paste("rDats/", lang, "_avgC-5_0_wWaicdf.RData", sep="")
+  load( file.path(post.dir, f_df) )
+  load( file.path(post.dir, f_mat) )
+  load( file.path(post.dir, f_looc) )
+  load( file.path(post.dir, f_waic) )
+  load( file.path(post.dir, f_wWaic) )
+  
+  family <- bf.df.F.5.0
+  family$loocs <- looc.df.F.5.0$loocs
+  family$waics <- - waic.F.5.0.df$dWAIC
+  family$wWaics <- waic.W.F.5.0.df$WAIC.weight[waic.W.F.5.0.df$model=="dependent"]
+  
+  upper.1 <- bf.df.F.5.0[bf.df.F.5.0$bayes.factors>=1,]
+  lower.1 <- bf.df.F.5.0[bf.df.F.5.0$bayes.factors<1,]
+
+  p.F.avgC.5.bf <- ggplot(bf.df.F.5.0) + 
+    geom_col(data=upper.1, aes(x=trait.pairs, y=bayes.factors), fill="green4") +
+    geom_col(data=lower.1, aes(x=trait.pairs, y=bayes.factors), fill="blue4") + 
+    geom_hline(yintercept=1, color="red", size=1.2) +
+    geom_hline(yintercept=5, color="orange", size=1) +
+    geom_hline(yintercept=1/5, color="orange", size=1.2) +
+    scale_y_continuous(trans="log2")+#, 
+                       #breaks=c(1, 5, 10, 100, 500, 4000000000), 
+                       #labels=c("1", "5", "10", "100", "500", "4 000 000 000") ) +
+    theme(text = element_text(size=18), axis.title.y=element_blank()) +
+    coord_flip() + labs( title=lang, subtitle=" - avgC-5" ) + 
+    ylab("Bayes Factors")
+  
+  plots[[i]] <- p.F.avgC.5.bf
+  unif.1 <- rep(0, 28)
+  unif.2 <- rep(0, 28)
+  unif.1.p <- rep(0, 28)
+  unif.2.p <- rep(0, 28)
+  for (j in 1:28) {
+    trait.name <- strsplit(trait.pairs[j], " ")[[1]]
+    data.name <- paste( lang, "_" ,trait.name[1], "-", trait.name[2], sep="" )
+    data.file.name <- file.path( dataprep.dir, "dat", lang, 
+                                 paste(data.name, "binom-0_dat.RData", sep="_") )
+    load(data.file.name)
+    trait.1 <- dat$x[1:dat$N]
+    trait.2 <- dat$x[(dat$N+1):(dat$N*2)]
+    unif.1[j] <- max(sum(trait.1), dat$N-sum(trait.1))
+    unif.2[j] <- max(sum(trait.2), dat$N-sum(trait.2))
+    unif.1.p[j] <- unif.1[j] / dat$N
+    unif.2.p[j] <- unif.2[j] / dat$N
+    
+    if (bf.df.F.5.0$bayes.factors[j] > 5){
+      trait.corr$bf_count[j] <- trait.corr$bf_count[j] + 1
+    }
+    if (looc.df.F.5.0$loocs[j] > 0){
+      trait.corr$looc_count[j] <- trait.corr$looc_count[j] + 1
+    }
+    if (waic.F.5.0.df$dWAIC[j] < 0){
+      trait.corr$waic_count[j] <- trait.corr$waic_count[j] + 1
+    }
+    if (waic.W.F.5.0.df$WAIC.weight[j] > 0.55){
+      trait.corr$wWaic_count[j] <- trait.corr$wWaic_count[j] + 1
+    }
+    if ( (bf.df.F.5.0$bayes.factors[j] > 5 & looc.df.F.5.0$loocs[j] > 0) 
+         || (bf.df.F.5.0$bayes.factors[j] < 5 & looc.df.F.5.0$loocs[j] < 0) ){
+      trait.corr$bfVlooc[j] <- trait.corr$bfVlooc[j] + 1
+    }
+    if ( (bf.df.F.5.0$bayes.factors[j] > 5 & waic.F.5.0.df$dWAIC[j] < 0) 
+         || (bf.df.F.5.0$bayes.factors[j] < 5 & waic.F.5.0.df$dWAIC[j] > 0) ){
+      trait.corr$bfVwaic[j] <- trait.corr$bfVwaic[j] + 1
+    }
+    if ( (bf.df.F.5.0$bayes.factors[j] > 5 & waic.W.F.5.0.df$WAIC.weight[j] > 0.6) 
+         || (bf.df.F.5.0$bayes.factors[j] < 5 & waic.W.F.5.0.df$WAIC.weight[j] < 0.6) ){
+      trait.corr$bfVwWaic[j] <- trait.corr$bfVwWaic[j] + 1
+    }
+    if ( (looc.df.F.5.0$loocs[j] > 0 & waic.F.5.0.df$dWAIC[j] < 0) 
+         || (looc.df.F.5.0$loocs[j] < 0 & waic.F.5.0.df$dWAIC[j] > 0) ){
+      trait.corr$loocVwaic[j] <- trait.corr$loocVwaic[j] + 1
+    }
+  }
+  C.file.name <- file.path( dataprep.dir, "dat", lang, 
+                            paste(lang, "_C.RData", sep="_") )
+  load(C.file.name)
+  
+  family$unif.1 <- unif.1
+  family$unif.2 <- unif.2
+  family$unif.1.p <- unif.1.p
+  family$unif.2.p <- unif.2.p
+  family$N = dat$N
+  family$C.depth <- lang.C[1,1]
+  family$names <- rep(lang, 28)
+  families <- rbind(families, family)
+}
+```
+
+```{r Collecting Dunn's}
+# ---- Austronesian ----
+load( file.path(post.dir, "rDats", "Austronesian_avgC-5_0_bfdf.RData") )
+load( file.path(post.dir, "rDats", "Austronesian_avgC-5_0_loocdf.RData") )
+load( file.path(post.dir, "rDats", "Austronesian_avgC-5_0_waicdf.RData") )
+load( file.path(post.dir, "rDats", "Austronesian_avgC-5_0_wWaicdf.RData") )
+waic.AN.5.0.df <- waic.F.5.0.df
+waic.W.AN.5.0.df <- waic.W.F.5.0.df
+
+family <- bf.df.AN.5.0
+family$loocs <- looc.df.AN.5.0$loocs
+family$waics <- - waic.AN.5.0.df$dWAIC
+family$wWaics <- waic.W.AN.5.0.df$WAIC.weight[waic.W.AN.5.0.df$model=="dependent"]
+
+unif.1 <- rep(0, 28)
+unif.2 <- rep(0, 28)
+unif.1.p <- rep(0, 28)
+unif.2.p <- rep(0, 28)
+for (j in 1:28) {
+  trait.name <- strsplit(trait.pairs[j], " ")[[1]]
+  data.name <- paste( "Austronesian_" ,trait.name[1], "-", trait.name[2], sep="" )
+  data.file.name <- file.path( dataprep.dir, "dat", "Austronesian", 
+                               paste(data.name, "binom-0_dat.RData", sep="_") )
+  load(data.file.name)
+  trait.1 <- dat$x[1:dat$N]
+  trait.2 <- dat$x[(dat$N+1):(dat$N*2)]
+  unif.1[j] <- max(sum(trait.1), dat$N-sum(trait.1))
+  unif.2[j] <- max(sum(trait.2), dat$N-sum(trait.2))
+  unif.1.p[j] <- unif.1[j] / dat$N
+  unif.2.p[j] <- unif.2[j] / dat$N
+}
+C.file.name <- file.path( dataprep.dir, "dat", "Austronesian", 
+                            paste("Austronesian__C.RData", sep="_") )
+load(C.file.name)
+
+family$unif.1 <- unif.1
+family$unif.2 <- unif.2
+family$unif.1.p <- unif.1.p
+family$unif.2.p <- unif.2.p
+family$N <- dat$N
+family$C.depth <- lang.C[1,1]
+family$names <- rep("Austronesian", 28)
+families <- rbind(families, family)
+
+upper.1 <- bf.df.AN.5.0[bf.df.AN.5.0$bayes.factors>=1,]
+lower.1 <- bf.df.AN.5.0[bf.df.AN.5.0$bayes.factors<1,]
+
+p.AN.avgC.5.bf <- ggplot(bf.df.AN.5.0) + 
+  geom_col(data=upper.1, aes(x=trait.pairs, y=bayes.factors), fill="green4") +
+  geom_col(data=lower.1, aes(x=trait.pairs, y=bayes.factors), fill="blue4") + 
+  geom_hline(yintercept=1, color="red", size=1.2) +
+  geom_hline(yintercept=5, color="orange", size=1) +
+  scale_y_continuous(trans="log2", 
+                     breaks=c(1, 5, 10, 100, 500, 4000000000), 
+                     labels=c("1", "5", "10", "100", "500", "4 000 000 000") ) +
+  theme(text = element_text(size=18), axis.title.y=element_blank()) +
+  coord_flip() + labs( title="Austronesian", subtitle=" - avgC-5" ) + 
+  ylab("Bayes Factors")
+all.plots <- plots[1:6]
+all.plots[[7]] <- p.AN.avgC.5.bf
+# ---- Bantu ----
+load( file.path(post.dir, "rDats", "Bantu_avgC-5_0_bfdf.RData") )
+load( file.path(post.dir, "rDats", "Bantu_avgC-5_0_loocdf.RData") )
+load( file.path(post.dir, "rDats", "Bantu_avgC-5_0_waicdf.RData") )
+load( file.path(post.dir, "rDats", "Bantu_avgC-5_0_wWaicdf.RData") )
+waic.BA.5.0.df <- waic.F.5.0.df
+waic.W.BA.5.0.df <- waic.W.F.5.0.df
+
+family <- bf.df.BA.5.0
+family$loocs <- looc.df.BA.5.0$loocs
+family$waics <- - waic.BA.5.0.df$dWAIC
+family$wWaics <- waic.W.BA.5.0.df$WAIC.weight[waic.W.BA.5.0.df$model=="dependent"]
+
+unif.1 <- rep(0, 28)
+unif.2 <- rep(0, 28)
+unif.1.p <- rep(0, 28)
+unif.2.p <- rep(0, 28)
+for (j in 1:28) {
+  trait.name <- strsplit(trait.pairs[j], " ")[[1]]
+  data.name <- paste( "Bantu_" ,trait.name[1], "-", trait.name[2], sep="" )
+  data.file.name <- file.path( dataprep.dir, "dat", "Bantu", 
+                               paste(data.name, "binom-0_dat.RData", sep="_") )
+  load(data.file.name)
+  trait.1 <- dat$x[1:dat$N]
+  trait.2 <- dat$x[(dat$N+1):(dat$N*2)]
+  unif.1[j] <- max(sum(trait.1), dat$N-sum(trait.1))
+  unif.2[j] <- max(sum(trait.2), dat$N-sum(trait.2))
+  unif.1.p[j] <- unif.1[j] / dat$N
+  unif.2.p[j] <- unif.2[j] / dat$N
+}
+C.file.name <- file.path( dataprep.dir, "dat", "Bantu", 
+                            "Bantu_avgC.RData" )
+load(C.file.name)
+
+family$unif.1 <- unif.1
+family$unif.2 <- unif.2
+family$unif.1.p <- unif.1.p
+family$unif.2.p <- unif.2.p
+family$N <- dat$N
+family$C.depth <- lang.C[1,1]
+family$names <- rep("Bantu", 28)
+families <- rbind(families, family)
+
+upper.1 <- bf.df.BA.5.0[bf.df.BA.5.0$bayes.factors>=1,]
+lower.1 <- bf.df.BA.5.0[bf.df.BA.5.0$bayes.factors<1,]
+
+p.BA.avgC.5.bf <- ggplot(bf.df.BA.5.0) + 
+  geom_col(data=upper.1, aes(x=trait.pairs, y=bayes.factors), fill="green4") +
+  geom_col(data=lower.1, aes(x=trait.pairs, y=bayes.factors), fill="blue4") + 
+  geom_hline(yintercept=1, color="red", size=1.2) +
+  geom_hline(yintercept=5, color="orange", size=1) +
+  scale_y_continuous(trans="log2", 
+                     breaks=c(1, 5, 10, 100, 500, 4000000000), 
+                     labels=c("1", "5", "10", "100", "500", "4 000 000 000") ) +
+  theme(text = element_text(size=18), axis.title.y=element_blank()) +
+  coord_flip() + labs( title="Bantu", subtitle=" - avgC-5" ) + 
+  ylab("Bayes Factors")
+# plots[[i+2]] <- p.BA.avgC.5.bf
+all.plots[[8]] <- p.BA.avgC.5.bf
+# ---- Indo-European ----
+load( file.path(post.dir, "rDats", "Indo-European_avgC-5_0_bfdf.RData") )
+load( file.path(post.dir, "rDats", "Indo-European_avgC-5_0_loocdf.RData") )
+load( file.path(post.dir, "rDats", "Indo-European_avgC-5_0_waicdf.RData") )
+load( file.path(post.dir, "rDats", "Indo-European_avgC-5_0_wWaicdf.RData") )
+waic.IE.5.0.df <- waic.F.5.0.df
+waic.W.IE.5.0.df <- waic.W.F.5.0.df
+
+family <- bf.df.IE.5.0
+family$loocs <- looc.df.IE.5.0$loocs
+family$waics <- - waic.IE.5.0.df$dWAIC
+family$wWaics <- waic.W.IE.5.0.df$WAIC.weight[waic.W.IE.5.0.df$model=="dependent"]
+
+unif.1 <- rep(0, 28)
+unif.2 <- rep(0, 28)
+unif.1.p <- rep(0, 28)
+unif.2.p <- rep(0, 28)
+for (j in 1:28) {
+  trait.name <- strsplit(trait.pairs[j], " ")[[1]]
+  data.name <- paste( "Indo-European_" ,trait.name[1], "-", trait.name[2], sep="" )
+  data.file.name <- file.path( dataprep.dir, "dat", "Indo-European", 
+                               paste(data.name, "binom-0_dat.RData", sep="_") )
+  load(data.file.name)
+  trait.1 <- dat$x[1:dat$N]
+  trait.2 <- dat$x[(dat$N+1):(dat$N*2)]
+  unif.1[j] <- max(sum(trait.1), dat$N-sum(trait.1))
+  unif.2[j] <- max(sum(trait.2), dat$N-sum(trait.2))
+  unif.1.p[j] <- unif.1[j] / dat$N
+  unif.2.p[j] <- unif.2[j] / dat$N
+}
+C.file.name <- file.path( dataprep.dir, "dat", "Indo-European", 
+                            paste("Indo-European__C.RData", sep="_") )
+load(C.file.name)
+
+family$unif.1 <- unif.1
+family$unif.2 <- unif.2
+family$unif.1.p <- unif.1.p
+family$unif.2.p <- unif.2.p
+family$N <- dat$N
+family$C.depth <- lang.C[1,1]
+family$names <- rep("Indo-European", 28)
+families <- rbind(families, family)
+
+upper.1 <- bf.df.IE.5.0[bf.df.IE.5.0$bayes.factors>=1,]
+lower.1 <- bf.df.IE.5.0[bf.df.IE.5.0$bayes.factors<1,]
+
+p.IE.avgC.5.bf <- ggplot(bf.df.IE.5.0) + 
+  geom_col(data=upper.1, aes(x=trait.pairs, y=bayes.factors), fill="green4") +
+  geom_col(data=lower.1, aes(x=trait.pairs, y=bayes.factors), fill="blue4") + 
+  geom_hline(yintercept=1, color="red", size=1.2) +
+  geom_hline(yintercept=5, color="orange", size=1) +
+  scale_y_continuous(trans="log2", 
+                     breaks=c(1, 5, 10, 100, 500, 4000000000), 
+                     labels=c("1", "5", "10", "100", "500", "4 000 000 000") ) +
+  theme(text = element_text(size=18), axis.title.y=element_blank()) +
+  coord_flip() + labs( title="Indo-European", subtitle=" - avgC-5" ) + 
+  ylab("Bayes Factors")
+#plots[[i+3]] <- p.IE.avgC.5.bf
+all.plots[9:13] <- plots[7:11]
+all.plots[[14]] <- p.IE.avgC.5.bf
+# ---- Uto-Aztecan ----
+load( file.path(post.dir, "rDats", "Uto-Aztecan_avgC-5_0_bfdf.RData") )
+load( file.path(post.dir, "rDats", "Uto-Aztecan_avgC-5_0_loocdf.RData") )
+load( file.path(post.dir, "rDats", "Uto-Aztecan_avgC-5_0_waicdf.RData") )
+load( file.path(post.dir, "rDats", "Uto-Aztecan_avgC-5_0_wWaicdf.RData") )
+waic.UA.5.0.df <- waic.F.5.0.df
+waic.W.UA.5.0.df <- waic.W.F.5.0.df
+
+family <- bf.df.UA.5.0
+family$loocs <- looc.df.UA.5.0$loocs
+family$waics <- - waic.UA.5.0.df$dWAIC
+family$wWaics <- waic.W.UA.5.0.df$WAIC.weight[waic.W.UA.5.0.df$model=="dependent"]
+
+unif.1 <- rep(0, 28)
+unif.2 <- rep(0, 28)
+unif.1.p <- rep(0, 28)
+unif.2.p <- rep(0, 28)
+for (j in 1:28) {
+  trait.name <- strsplit(trait.pairs[j], " ")[[1]]
+  data.name <- paste( "Uto-Aztecan_" ,trait.name[1], "-", trait.name[2], sep="" )
+  data.file.name <- file.path( dataprep.dir, "dat", "Uto-Aztecan", 
+                               paste(data.name, "binom-0_dat.RData", sep="_") )
+  load(data.file.name)
+  trait.1 <- dat$x[1:dat$N]
+  trait.2 <- dat$x[(dat$N+1):(dat$N*2)]
+  unif.1[j] <- max(sum(trait.1), dat$N-sum(trait.1))
+  unif.2[j] <- max(sum(trait.2), dat$N-sum(trait.2))
+  unif.1.p[j] <- unif.1[j] / dat$N
+  unif.2.p[j] <- unif.2[j] / dat$N
+}
+C.file.name <- file.path( dataprep.dir, "dat", "Uto-Aztecan", 
+                            paste("Uto-Aztecan__avgC-5.RData", sep="_") )
+load(C.file.name)
+family$unif.1 <- unif.1
+family$unif.2 <- unif.2
+family$unif.1.p <- unif.1.p
+family$unif.2.p <- unif.2.p
+family$N <- dat$N
+family$C.depth <- mean(sapply(lang.C, function(x) x[1,1]))
+family$names <- rep("Uto-Aztecan", 28)
+families <- rbind(families, family)
+
+upper.1 <- bf.df.UA.5.0[bf.df.UA.5.0$bayes.factors>=1,]
+lower.1 <- bf.df.UA.5.0[bf.df.UA.5.0$bayes.factors<1,]
+
+p.UA.avgC.5.bf <- ggplot(bf.df.UA.5.0) + 
+  geom_col(data=upper.1, aes(x=trait.pairs, y=bayes.factors), fill="green4") +
+  geom_col(data=lower.1, aes(x=trait.pairs, y=bayes.factors), fill="blue4") + 
+  geom_hline(yintercept=1, color="red", size=1.2) +
+  geom_hline(yintercept=5, color="orange", size=1) +
+  scale_y_continuous(trans="log2", 
+                     breaks=c(1, 5, 10, 100, 500, 4000000000), 
+                     labels=c("1", "5", "10", "100", "500", "4 000 000 000") ) +
+  theme(text = element_text(size=18), axis.title.y=element_blank()) +
+  coord_flip() + labs( title="Uto-Aztecan", subtitle=" - avgC-5" ) + 
+  ylab("Bayes Factors")
+#plots[[i+4]] <- p.UA.avgC.5.bf
+all.plots[15:34] <- plots[12:31]
+all.plots[[35]] <- p.UA.avgC.5.bf
+
+for (j in 1:28){
+    
+  if (bf.df.AN.5.0$bayes.factors[j] > 5){
+    trait.corr$bf_count[j] <- trait.corr$bf_count[j] + 1
+  }
+  if (bf.df.BA.5.0$bayes.factors[j] > 5){
+    trait.corr$bf_count[j] <- trait.corr$bf_count[j] + 1
+  }
+  if (bf.df.IE.5.0$bayes.factors[j] > 5){
+    trait.corr$bf_count[j] <- trait.corr$bf_count[j] + 1
+  }
+  if (bf.df.UA.5.0$bayes.factors[j] > 5){
+    trait.corr$bf_count[j] <- trait.corr$bf_count[j] + 1
+  }
+  if (looc.df.AN.5.0$loocs[j] > 0){
+    trait.corr$looc_count[j] <- trait.corr$looc_count[j] + 1
+  }
+  if (looc.df.BA.5.0$loocs[j] > 0){
+    trait.corr$looc_count[j] <- trait.corr$looc_count[j] + 1
+  }
+  if (looc.df.IE.5.0$loocs[j] > 0){
+    trait.corr$looc_count[j] <- trait.corr$looc_count[j] + 1
+  }
+  if (looc.df.UA.5.0$loocs[j] > 0){
+    trait.corr$looc_count[j] <- trait.corr$looc_count[j] + 1
+  }
+  if (waic.AN.5.0.df$dWAIC[j] < 0){
+    trait.corr$looc_count[j] <- trait.corr$looc_count[j] + 1
+  }
+  if (waic.BA.5.0.df$dWAIC[j] < 0){
+    trait.corr$looc_count[j] <- trait.corr$looc_count[j] + 1
+  }
+  if (waic.IE.5.0.df$dWAIC[j] < 0){
+    trait.corr$looc_count[j] <- trait.corr$looc_count[j] + 1
+  }
+  if (waic.UA.5.0.df$dWAIC[j] < 0){
+    trait.corr$looc_count[j] <- trait.corr$looc_count[j] + 1
+  }
+  if (waic.W.AN.5.0.df$WAIC.weight[j] > 0.55){
+    trait.corr$looc_count[j] <- trait.corr$looc_count[j] + 1
+  }
+  if (waic.W.BA.5.0.df$WAIC.weight[j] > 0.55){
+    trait.corr$looc_count[j] <- trait.corr$looc_count[j] + 1
+  }
+  if (waic.W.IE.5.0.df$WAIC.weight[j] > 0.55){
+    trait.corr$looc_count[j] <- trait.corr$looc_count[j] + 1
+  }
+  if (waic.W.UA.5.0.df$WAIC.weight[j] > 0.55){
+    trait.corr$looc_count[j] <- trait.corr$looc_count[j] + 1
+  }
+  
+  if ( (bf.df.AN.5.0$bayes.factors[j] > 5 & looc.df.AN.5.0$loocs[j] > 0) 
+       || (bf.df.AN.5.0$bayes.factors[j] < 5 & looc.df.AN.5.0$loocs[j] < 0) ){
+    trait.corr$bfVlooc[j] <- trait.corr$bfVlooc[j] + 1
+  }
+  if ( (bf.df.AN.5.0$bayes.factors[j] > 5 & waic.AN.5.0.df$dWAIC[j] < 0) 
+    || (bf.df.AN.5.0$bayes.factors[j] < 5 & waic.AN.5.0.df$dWAIC[j] > 0) ){
+    trait.corr$bfVwaic[j] <- trait.corr$bfVwaic[j] + 1
+  }
+  if ( (bf.df.AN.5.0$bayes.factors[j] > 5 & waic.W.AN.5.0.df$WAIC.weight[j] > 0.55)
+       || (bf.df.AN.5.0$bayes.factors[j] < 5 & waic.W.AN.5.0.df$WAIC.weight[j] < 0.6) ){
+    trait.corr$bfVwWaic[j] <- trait.corr$bfVwWaic[j] + 1
+  }
+  if ( (looc.df.AN.5.0$loocs[j] > 0 & waic.AN.5.0.df$dWAIC[j] < 0)
+       || (looc.df.AN.5.0$loocs[j] < 0 & waic.AN.5.0.df$dWAIC[j] > 0) ){
+    trait.corr$loocVwaic[j] <- trait.corr$loocVwaic[j] + 1
+  }
+  if ( (bf.df.BA.5.0$bayes.factors[j] > 5 & looc.df.BA.5.0$loocs[j] > 0)
+       || (bf.df.BA.5.0$bayes.factors[j] < 5 & looc.df.BA.5.0$loocs[j] < 0) ){
+    trait.corr$bfVlooc[j] <- trait.corr$bfVlooc[j] + 1
+  }
+  if ( (bf.df.BA.5.0$bayes.factors[j] > 5 & waic.BA.5.0.df$dWAIC[j] < 0) 
+       || (bf.df.BA.5.0$bayes.factors[j] < 5 & waic.BA.5.0.df$dWAIC[j] > 0) ){
+    trait.corr$bfVwaic[j] <- trait.corr$bfVwaic[j] + 1
+  }
+  if ( (bf.df.BA.5.0$bayes.factors[j] > 5 & waic.W.BA.5.0.df$WAIC.weight[j] > 0.6) 
+       || (bf.df.BA.5.0$bayes.factors[j] < 5 & waic.W.BA.5.0.df$WAIC.weight[j] < 0.6) ){
+    trait.corr$bfVwWaic[j] <- trait.corr$bfVwWaic[j] + 1
+  }
+  if ( (looc.df.BA.5.0$loocs[j] > 0 & waic.BA.5.0.df$dWAIC[j] < 0)
+       || (looc.df.BA.5.0$loocs[j] < 0 & waic.BA.5.0.df$dWAIC[j] > 0) ){
+    trait.corr$loocVwaic[j] <- trait.corr$loocVwaic[j] + 1
+  }
+  if ( (bf.df.IE.5.0$bayes.factors[j] > 5 & looc.df.IE.5.0$loocs[j] > 0)
+       || (bf.df.IE.5.0$bayes.factors[j] < 5 & looc.df.IE.5.0$loocs[j] < 0) ){
+    trait.corr$bfVlooc[j] <- trait.corr$bfVlooc[j] + 1
+  }
+  if ( (bf.df.IE.5.0$bayes.factors[j] > 5 & waic.IE.5.0.df$dWAIC[j] < 0)
+       || (bf.df.IE.5.0$bayes.factors[j] < 5 & waic.IE.5.0.df$dWAIC[j] > 0) ){
+    trait.corr$bfVwaic[j] <- trait.corr$bfVwaic[j] + 1
+  }
+  if ( (bf.df.IE.5.0$bayes.factors[j] > 5 & waic.W.IE.5.0.df$WAIC.weight[j] > 0.6) 
+       || (bf.df.IE.5.0$bayes.factors[j] < 5 & waic.W.IE.5.0.df$WAIC.weight[j] < 0.6) ){
+    trait.corr$bfVwWaic[j] <- trait.corr$bfVwWaic[j] + 1
+  }
+  if ( (looc.df.IE.5.0$loocs[j] > 0 & waic.IE.5.0.df$dWAIC[j] < 0)
+       || (looc.df.IE.5.0$loocs[j] < 0 & waic.IE.5.0.df$dWAIC[j] > 0) ){
+    trait.corr$loocVwaic[j] <- trait.corr$loocVwaic[j] + 1
+  }
+  if ( (bf.df.UA.5.0$bayes.factors[j] > 5 & looc.df.UA.5.0$loocs[j] > 0)
+       || (bf.df.UA.5.0$bayes.factors[j] < 5 & looc.df.UA.5.0$loocs[j] < 0) ){
+    trait.corr$bfVlooc[j] <- trait.corr$bfVlooc[j] + 1
+  }
+  if ( (bf.df.UA.5.0$bayes.factors[j] > 5 & waic.UA.5.0.df$dWAIC[j] < 0)
+       || (bf.df.UA.5.0$bayes.factors[j] < 5 & waic.UA.5.0.df$dWAIC[j] > 0) ){
+    trait.corr$bfVwaic[j] <- trait.corr$bfVwaic[j] + 1
+  }
+  if ( (bf.df.UA.5.0$bayes.factors[j] > 5 & waic.W.UA.5.0.df$WAIC.weight[j] > 0.6)
+       || (bf.df.UA.5.0$bayes.factors[j] < 5 & waic.W.UA.5.0.df$WAIC.weight[j] < 0.6) ){
+    trait.corr$bfVwWaic[j] <- trait.corr$bfVwWaic[j] + 1
+  }
+  if ( (looc.df.UA.5.0$loocs[j] > 0 & waic.UA.5.0.df$dWAIC[j] < 0)
+       || (looc.df.UA.5.0$loocs[j] < 0 & waic.UA.5.0.df$dWAIC[j] > 0) ){
+    trait.corr$loocVwaic[j] <- trait.corr$loocVwaic[j] + 1
+  }
+}
+```
+
+# ======== Counts ======== 
+
+```{r Correlations across Families, fig.height=6, fig.width=17}
+# Figure 13:
+count.bf <- ggplot(trait.corr) + 
+  geom_col(aes(x=trait.pairs, y=bf_count)) +
+  theme(text = element_text(size=18), axis.title.y=element_blank()) +
+  coord_flip() + labs( title="Correlated Pairs", subtitle="among families" ) + 
+  ylab("counts - Bayes Factors (>5)")
+count.looc <- ggplot(trait.corr) + 
+  geom_col(aes(x=trait.pairs, y=looc_count)) +
+  theme(text = element_text(size=18), axis.title.y=element_blank()) +
+  coord_flip() + labs( title="", subtitle="" ) + 
+  ylab("counts - elpd-diff")
+count.waic <- ggplot(trait.corr) + 
+  geom_col(aes(x=trait.pairs, y=waic_count)) +
+  theme(text = element_text(size=18), axis.title.y=element_blank()) +
+  coord_flip() + labs( title="", subtitle="" ) + 
+  ylab("counts - WAIC")
+count.wWaic <- ggplot(trait.corr) + 
+  geom_col(aes(x=trait.pairs, y=wWaic_count)) +
+  theme(text = element_text(size=18), axis.title.y=element_blank()) +
+  coord_flip() + labs( title="", subtitle="" ) + 
+  ylab("counts - WAIC weights (>0.6)")
+#Figure 19:
+ggarrange(count.bf, count.looc, count.waic, count.wWaic, nrow=1, ncol=4)
+```
+
+```{r fig.height=6, fig.width=6}
+count.bf
+```
+
+```{r Metric Agreement, fig.height=6, fig.width=17}
+trait.corr$bfVlooc.p <- trait.corr$bfVlooc / 35
+trait.corr$bfVwaic.p <- trait.corr$bfVwaic / 35
+trait.corr$bfVwWaic.p <- trait.corr$bfVwWaic / 35
+trait.corr$loocVwaic.p <- trait.corr$loocVwaic / 35
+p.bfVlooc <- ggplot(trait.corr) + 
+  geom_col(aes(x=trait.pairs, y=bfVlooc.p)) +
+  theme(text = element_text(size=18), axis.title.y=element_blank()) +
+  coord_flip(ylim=c(0.45,1)) + 
+  labs( title="Metric Agreement", subtitle="among families" ) + 
+  scale_y_continuous(breaks=c(0.5, 0.6, 0.7, 0.8, 0.9, 1)) +
+  ylab("Bayes Factors - dELPD")
+p.bfVwaic <- ggplot(trait.corr) + 
+  geom_col(aes(x=trait.pairs, y=bfVwaic.p)) +
+  theme(text = element_text(size=18)) +
+  coord_flip(ylim=c(0.45,1)) + 
+  labs( title="", subtitle="" ) + 
+  scale_y_continuous(breaks=c(0.5, 0.6, 0.7, 0.8, 0.9, 1)) +
+  ylab("Bayes Factors - dWAIC") + theme(axis.title.y=element_blank())
+p.bfVwWaic <- ggplot(trait.corr) + 
+  geom_col(aes(x=trait.pairs, y=bfVwWaic.p)) +
+  theme(text = element_text(size=18)) +
+  coord_flip(ylim=c(0.45,1)) + 
+  scale_y_continuous(breaks=c(0.5, 0.6, 0.7, 0.8, 0.9, 1)) +
+  labs( title="", subtitle="" ) + 
+  ylab("Bayes Factors - WAIC weights") + theme(axis.title.y=element_blank())
+p.loocVwaic <- ggplot(trait.corr) + 
+  geom_col(aes(x=trait.pairs, y=loocVwaic.p)) +
+  theme(text = element_text(size=18)) +
+  coord_flip(ylim=c(0.45,1)) + 
+  labs( title="", subtitle="" ) + 
+  scale_y_continuous(breaks=c(0.5, 0.6, 0.7, 0.8, 0.9, 1)) +
+  ylab("dELPD - dWAIC") + theme(axis.title.y=element_blank())
+# Figure 20:
+ggarrange(p.bfVlooc, p.bfVwaic, p.bfVwWaic, p.loocVwaic,
+          ncol=4, nrow=1)
+```
+
+# ======== Data Modifications ======== 
+
+```{r additional columns, paged.print=FALSE}
+families <- families[-c(1),]
+families$trait.pairs <- paste(families$names, families$trait.pairs, sep=":")
+# bayes factors against dependencies reframed as negative values with same magnitude as bayes factors for dependencies:
+families$bayes.factors.2 <- families$bayes.factors
+families$bayes.factors.2[families$bayes.factors.2<1] <- - 1 /
+                                                  families$bayes.factors.2[families$bayes.factors.2<1]
+
+# trait uniformity:
+families$unif.p.sum <- families$unif.1.p + families$unif.2.p
+
+families.uniform.1 <- families[(families$unif.1.p==1),]
+families.uniform.2 <- families[(families$unif.2.p==1),]
+families.uniform.12 <- unique(rbind(families.uniform.1, families.uniform.2))
+
+families.diff <- families[families$unif.1.p<1 & families$unif.2.p<1,]
+
+head(families)
+```
+
+# ======== Metric Correlations ======== 
+
+```{r loocVbf, fig.height=5, fig.width=5}
+# compare loo to bayes factors
+loocVbf.2 <- ggplot(families) + 
+  geom_point(mapping=aes(x=bayes.factors.2, y=loocs), color="black") +
+  geom_smooth(mapping=aes(x=bayes.factors.2, y=loocs), method=lm, color="black", se=FALSE) + 
+  scale_x_continuous(trans="pseudo_log", 
+                     breaks=c(-100, -5, 1, 5, 100, 1e4, 1e8), labels=c("-100", "-5", "1", "5", "100", "1e4", "1e8") ) +
+  theme(text = element_text(size=17)) +
+  ylab("ELPD-diff") + xlab("Bayes Factors") + labs(title="Correlation", subtitle="LOOC / Bayes Factors" )
+```
+
+```{r waicVbf, fig.height=5, fig.width=5}
+# compare waic to Bayes Factors
+waicVbf.2 <- ggplot(families) + 
+  geom_point(mapping=aes(x=bayes.factors.2, y=waics), color="black") +
+  geom_smooth(mapping=aes(x=bayes.factors.2, y=waics), method=lm, color="black", se=FALSE) + 
+  scale_x_continuous(trans="pseudo_log", 
+                     breaks=c(-100, -5, 1, 5, 100, 1e4, 1e8), labels=c("-100", "-5", "1", "5", "100", "1e4", "1e8") ) +
+  theme(text = element_text(size=17)) +
+  ylab("WAIC") + xlab("Bayes Factors") + labs(title="", subtitle="WAIC / Bayes Factors" )
+
+waicVbf
+```
+```{r loocVwaic, fig.height=5, fig.width=5}
+# compare loo to waic
+loocVwaic <- ggplot(families) + 
+  geom_point(mapping=aes(x=waics, y=loocs), color="black") +
+  geom_smooth(mapping=aes(x=waics, y=loocs), method=lm, color="black", se=FALSE) + 
+  theme(text = element_text(size=17)) +
+  ylab("ELPD-diff") + xlab("WAIC") + labs(title="", subtitle="LOOC / WAIC" )
+loocVwaic
+```
+
+```{r grid, fig.height=6, fig.width=16}
+#Figure 21:
+ggarrange(loocVbf.2, waicVbf.2, loocVwaic, nrow=1, ncol=3)
+```
+
+# ======== Uniformity ======== 
+
+```{r bfVunif, fig.height=5, fig.width=7.5}
+# compare bayes factor magnitude to trait uniformity
+bfVunif <- ggplot(families) + 
+  geom_abline(intercept=0, slope=1, color="grey", lwd=2) + 
+  geom_point(mapping=aes(x=unif.p.sum, y=abs(bayes.factors.2)), color="black") +
+  geom_smooth(mapping=aes(x=unif.p.sum, y=abs(bayes.factors.2)), method=lm, color="black", se=FALSE) + 
+  scale_y_continuous(trans="log2") + theme(text = element_text(size=13)) +
+  coord_cartesian(ylim=c(1, 16384)) +
+  xlab("uniformity") +ylab("Bayes Factors") + 
+  labs(title="Correlation", subtitle="trait uniformity\n/ magnitude of Bayes Factors" )
+
+
+families.diff$type <- rep("div", length(families.diff$bayes.factors.2))
+families.uniform.12$type <- rep("unif", length(families.uniform.12$bayes.factors.2))
+
+bfVunif.dens.3 <- ggplot(rbind(families.diff, families.uniform.12)) + 
+  geom_density(aes(x=abs(bayes.factors.2), group=type, fill=type)) +
+  scale_x_continuous(trans="log2", breaks=c(1, 2.5, 5, 100, 1e4, 1e8), labels=c("1", "2.5", "5", "100", "1e4", "1e8") ) +
+  scale_fill_viridis_d(alpha=0.6) + coord_cartesian(xlim=c(1,5)) +
+  theme(axis.title.y=element_blank(), text = element_text(size=13)) + 
+  xlab("Bayes Factors") + labs(title="Density", subtitle="trait uniformity across families")
+
+
+# Figure 14:
+ggarrange(bfVunif, bfVunif.dens.3,
+          ncol=2, nrow=1)
+```
+
+# ======== Family Size ======== 
+
+```{r bfVN, fig.height=6, fig.width=6}
+families.avg <- data.frame(names=unique(families$names))
+families.avg$N <- rep(0, 35)
+families.avg$bayes.factors <- rep(1,35)
+for (name in families.avg$names) {
+  families.avg$N[families.avg$names==name] <- mean(families$N[families$names==name])
+  families.avg$bayes.factors[families.avg$names==name] <- mean(abs(families$bayes.factors.2[families$names==name]))
+}
+
+bfVN.2 <- ggplot(families) + 
+  geom_point(mapping=aes(x=N, y=abs(bayes.factors.2)), color="purple") +
+  geom_smooth(mapping=aes(x=N, y=abs(bayes.factors.2)), method=lm, color="purple", se=FALSE) + 
+  geom_point(data=families.avg, mapping=aes(x=N, y=bayes.factors), color="orange") +
+  geom_smooth(data=families.avg, mapping=aes(x=N, y=bayes.factors), method=lm, color="orange", se=FALSE) + 
+  scale_y_continuous(trans="log2") +
+  coord_cartesian(ylim=c(1, 16384)) +
+  xlab("Family size") +ylab("Bayes Factors") + 
+  theme(text = element_text(size=14)) + 
+  labs(title="Correlation", subtitle="number of languages per family \n/ magnitude of Bayes Factors" )
+# Figure 15:
+bfVN.2
+```
+
+# ======== Families' Bayes Factors ======== 
+
+```{r grid stuff, fig.height=30, fig.width=21}
+# Figure 10:
+F.grid.1 <- ggarrange(plotlist=all.plots[1:12], ncol=3, nrow=4)
+F.grid.1
+```
+
+```{r grid stuff, fig.height=30, fig.width=21}
+# Figure 11:
+F.grid.2 <- ggarrange(plotlist=all.plots[13:24], ncol=3, nrow=4)
+F.grid.2
+```
+
+```{r grid stuff, fig.height=30, fig.width=21}
+# Figure 12:
+F.grid.3 <- ggarrange(plotlist=all.plots[25:35], ncol=3, nrow=4)
+F.grid.3
+```
+
+
+

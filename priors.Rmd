@@ -1,0 +1,68 @@
+---
+title: "priors"
+output: html_document
+---
+
+```{r lib, message=FALSE, warning=FALSE}
+library(ggplot2)
+library(rethinking)
+```
+
+```{r plot correlation}
+eta <- c(sapply(list(1, 100, 0.1, 0.8), function(x) rep(x, 1000)))
+df.corr <- data.frame( eta )
+eta.1 <- rlkjcorr(1000, 2, eta=1)[,1,2]
+eta.100 <- rlkjcorr(1000, 2, eta=10)[,1,2]
+eta.01 <- rlkjcorr(1000, 2, eta=0.1)[,1,2]
+eta.08 <- rlkjcorr(1000, 2, eta=0.8)[,1,2]
+df.corr$R12 <- c(eta.1, eta.100, eta.01, eta.08)
+df.corr$lab <- as.character(df.corr$eta)
+# Figure 3:
+ggplot(data=df.corr, mapping=aes(x=R12, group=eta, colour=lab, fill=lab)) + 
+  geom_density(size=1, alpha=0.1) +
+  scale_colour_manual(values=c("1"="yellow1", "100"="blue", "0.1"="green", "0.8"="red"), 
+                     aesthetics=c("colour", "fill"), name="\u03b7" ) +
+  theme(text = element_text(size = 15)) + 
+  xlab(expression(R["1,2"]))
+```
+
+
+```{r plot correlation scale}
+lambda <- c(sapply(list(1, 0.1, 10), function(x) rep(x, 1000)))
+df.sigma <- data.frame( lambda )
+lambda.1 <- rexp(1000, rate=1)
+lambda.01 <- rexp(1000, rate=0.1)
+lambda.10 <- rexp(1000, rate=10)
+df.sigma$sigma <- c(lambda.1, lambda.01, lambda.10)
+df.sigma$lab <- as.character(df.sigma$lambda)
+
+# Figure 4:
+ggplot(data=df.sigma, mapping=aes(x=sigma, group=lambda, colour=lab, fill=lab)) + 
+  geom_density(size=1, alpha=0.1) +
+  scale_colour_manual(values=c("1"="red", "0.1"="yellow1", "10"="purple"), 
+                      aesthetics=c("colour", "fill"), name="\u03bb" ) +
+  theme(text = element_text(size = 15)) + 
+  xlab("\u03c3") +
+  coord_cartesian(xlim=c(0, 5), ylim=c(0, 1))
+```
+
+```{r plot mean}
+scale <- c(sapply(list("logit", "outcome"), function(x) rep(x, 1000)))
+df.a <- data.frame( scale )
+a <- rnorm(1000, mean=0, sd=1.5)
+inv.logit.a <- inv_logit(a)
+df.a$a <- c(a, inv.logit.a)
+
+# Figure 5:
+ggplot(data=df.a, mapping=aes(x=a, group=scale, colour=scale, fill=scale)) + 
+  geom_density(aes(y=..scaled..), size=1, alpha=0.1) +
+  scale_colour_manual(values=c("logit"="red", "outcome"="purple"), 
+                      aesthetics=c("colour", "fill")) +
+  theme(text = element_text(size = 15)) + 
+  coord_cartesian(xlim=c(-3.5, 3.5)) +
+  ylab("scaled density")
+```
+
+
+
+

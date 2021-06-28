@@ -1,0 +1,88 @@
+---
+title: "dataprep_full"
+output: html_document
+---
+
+```{r sourcce, message=FALSE, warning=FALSE}
+setwd(dirname(getwd()))
+source('paths.R', encoding="utf8" )
+source( file.path(fit.dir, 'fit.R'), encoding="utf8" )
+source( file.path(dataprep.dir, 'dataprep.R'), encoding="utf8" )
+```
+
+prepare data specifically for models over all languages
+
+```{r load data}
+trait.names <- c( "AN", "PN", "ND", "NG", "NNum", "VO", "NRc", "VS" )
+t.pairs <- c()
+
+for (trait.name.1 in trait.names){
+  for (trait.name.2 in trait.names){
+    pair = paste( trait.name.1, trait.name.2 )
+    
+    if ( (trait.name.1 != trait.name.2) & !(pair %in% t.pairs) ){
+      print( paste("---", trait.name.1, "-", trait.name.2) )
+      
+      t.pairs = c( t.pairs, pair, paste(trait.name.2, trait.name.1) )
+      
+      lang <- "full"
+      
+      # setup save
+      save.dir <- file.path("dat", lang)
+      if (!dir.exists(save.dir)) { dir.create(save.dir) }
+      
+      data.name <- paste( lang, "_" ,trait.name.1, "-", trait.name.2, sep="" )
+      file.name.dat <- file.path( paste(data.name, "binom-0_dat.RData", sep="_") )
+      file.name.C <- file.path( paste(lang, "_avgC-5.RData", sep="_") )
+      
+      if (!file.exists(file.path(save.dir, file.name.C))){
+        lang.data <- get.data.full( c(trait.name.1, trait.name.2), avg=TRUE, other=0, n_avg=5, getC=TRUE )
+        lang.C <- lang.data$Cs
+        save( lang.C, file=file.path(save.dir, file.name.C) )
+        
+        lang.names <- lang.data$lang.names
+        
+        rm(lang.C)
+      } else {
+        lang.data <- get.data.full( c(trait.name.1, trait.name.2), avg=TRUE, other=0, n_avg=5, getC=FALSE )
+        assertthat::are_equal(lang.names, lang.data$lang.names)
+      }
+      
+      dat <- list(
+        N = lang.data$N,
+        x = lang.data$traits,
+        M = 5,
+        # Hyperparameters
+        eta = 0.8,
+        lambda = 1,
+        mu_z = 0,
+        sigma_z = 1.5
+      )
+      save( dat, file=file.path(save.dir, file.name.dat) )
+      
+      remove( dat, lang.data )
+      gc(verbose=FALSE)
+    }
+  }
+}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

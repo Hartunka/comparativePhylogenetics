@@ -1,0 +1,161 @@
+---
+title: "fit_single"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r source, message=FALSE, warning=FALSE}
+setwd(dirname(getwd()))
+source('libraries.R', encoding="utf8")
+source('paths.R', encoding="utf8")
+source( file.path(dataprep.dir, 'dataprep.R'), encoding="utf8")
+```
+
+data:
+
+N : int, number of languages
+feats_lang : data.frame, feats of languages for current family
+trees.C : list, covariance matrices for language trees
+
+features:
+
+- NA : noun adjective order
+    0: noun-adjective, 1:adjective-noun, -: other
+  rename to AN, to avoid naming conflict
+    
+- PN : adposition noun order
+    0: prepositions, 1: adpositions, -: other
+    
+- ND : noun demonstrative order
+    0: noun-demonstrative, 1: demonstrative-noun, -: other
+
+- NG : noun genetive order
+    0: noun-genetive, 1: genetive-noun, -: other
+
+- NNum : noun numeral order
+    0: noun-numeral, 1: numeral-noun, -: other
+
+- VO : verb object order
+    0: verb-object, 1:object-verb, -: other
+
+- NRc : noun relative clause order
+    0: noun-relative clause, 1: relative clause-noun, -: other
+
+- VS : verb subject order
+    0: verb-subject, 1: subject-verb, -: other
+-> after data preparation:
+  - : 1; 0 : 2; 1 : 3
+
+
+'Problematic' pairs:
+AN - ND,
+AN - VO,
+ND - VO
+-> Healthy Chains with independence assumption
+```{r prep feats}
+lang <- "Uto-Aztecan"
+target.trait.name <- "NG"
+pred.trait.name.1 <- "NNum"
+# pred.trait.name.2 <- "VS"
+feats <- read.feats(lang, bin=TRUE, other=0)
+
+lang.names <- as.character( feats$X )
+C <- read.trees(lang, lang.names)
+
+N <- length(rownames(C[[1]]))
+
+# reorder matrices to fit feature order
+lang.names <- as.character( feats[feats$glot == lang,]$X )
+for ( i in 1:length(C) ) {
+  C[[i]] <- C[[i]][lang.names, lang.names]
+}
+
+target.trait <- as.integer( unlist(feats[target.trait.name]) )
+pred.trait.1 <- as.integer( unlist(feats[pred.trait.name.1]) )
+# pred.trait.2 <- as.integer( unlist(feats[pred.trait.name.2]) )
+
+```
+```{r set TwoTraitModel}
+
+dat <- list(
+  N = N,
+  nX = 1,
+  y = target.trait,
+  x = list(pred.trait.1), #, pred.trait.2),
+  nMat = length(C),
+  C = C,
+  # Hyperparameters
+  lambda = 1
+)
+
+options(mc.cores = parallel::detectCores())
+# memory.limit( size=40000 )
+chains <- 4
+
+model <- cmdstan_model( file.path( models.dir, 'McElreath', 'McElreath-multiC-binom-cholesky.stan' ) )
+model$check_syntax(pedantic=TRUE)
+```
+```{r fit}
+fit <- model$sample(
+  data=dat, chains=chains, parallel_chains=chains, iter_sampling=4000, iter_warmup=4000,
+  refresh=800, save_warmup=TRUE,
+  max_treedepth=10, adapt_delta=0.8
+)
+beepr::beep(2)
+```
+
+## cmdstanr diagnostics
+
+```{r posterior histograms, paged.print=FALSE}
+mcmc_hist(fit$draws("alpha"))
+mcmc_hist(fit$draws("beta"))
+mcmc_hist(fit$draws("mu"))
+mcmc_hist(fit$draws("sigma_sq"))
+```
+
+```{r summary / sampler diagnostics, paged.print=FALSE}
+fit$cmdstan_summary()
+```
+
+## stanfit diagnostics
+
+```{r make stanfit}
+stanfit <- rstan::read_stan_csv(fit$output_files())
+```
+
+```{r parameters}
+print(stanfit, pars=c("alpha", "beta", "mu", "sigma_sq"))
+plot(stanfit, pars=c("alpha", "beta", "mu", "sigma_sq"))
+```
+
+```{r pairs, fig.width=12}
+pairs(stanfit, pars=c("alpha", "beta", "mu", "sigma_sq"))
+```
+
+```{r chain traces(a, mu, R)}
+rstan::traceplot(stanfit, pars=c( "alpha" ), inc_warmup=TRUE)
+rstan::traceplot(stanfit, pars=c( "beta" ), inc_warmup=TRUE)
+rstan::traceplot(stanfit, pars=c( "mu" ), inc_warmup=TRUE)
+rstan::traceplot(stanfit, pars=c( "sigma_sq" ), inc_warmup=TRUE)
+```
+
+```{r loo}
+fit.log_lik <- extract_log_lik(stanfit, merge_chains=FALSE)
+r_eff <- relative_eff(exp(fit.log_lik), cores = 4)
+fit.loo <- loo(fit.log_lik, r_eff=r_eff, cores = 4)
+print(fit.loo)
+```
+
+```{r dWaic, paged.print=FALSE}
+rethinking::WAIC(stanfit)
+rethinking::PSIS(stanfit)
+```
+
+```{r finished}
+beepr::beep(8)
+```
+
+
+
+

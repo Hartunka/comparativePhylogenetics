@@ -1,0 +1,217 @@
+---
+title: "fit_batch_clean"
+output: html_document
+---
+
+```{r sourcce, message=FALSE, warning=FALSE}
+setwd(dirname(getwd()))
+source('paths.R', encoding="utf8" )
+source( file.path(post.dir, 'diagnostics.R'), encoding="utf8" )
+source( file.path(fit.dir, 'fit.R'), encoding="utf8" )
+source( file.path(dataprep.dir, 'dataprep.R'), encoding="utf8" )
+library(rstan)
+library(bridgesampling)
+library(ggplot2)
+```
+
+
+```{r compile models}
+options(mc.cores = parallel::detectCores())
+#memory.limit( size=30000 )
+
+model.1 <- rstan::stan_model( 
+  file.path( models.dir, 'categorical', 'Binom-cholesky-nonCentered-main.stan' ),
+  model_name="cholesky-binom-dep", auto_write=TRUE  )
+  #file.path( models.dir, 'categorical', 'Binom-cholesky-nonCentered-fullLang-lin.stan' ),
+  #model_name="cholesky-binom-lin" )
+model.2 <- rstan::stan_model( 
+  file.path( models.dir, 'categorical', 'Binom-cholesky-nonCentered-indep-main.stan' ),
+  model_name="cholesky-binom-indep", auto_write=TRUE )
+  #file.path( models.dir, 'categorical', 'Binom-cholesky-nonCentered-fullLang-univ.stan' ),
+  #model_name="cholesky-binom-univ" )
+```
+
+```{r read/compute bayes factors}
+#lang.fam.names <- c( "Afro-Asiatic", "Algic", "Arawakan", "Athapaskan-Eyak-Tlingit", "Atlantic-Congo",
+#                    "Austroasiatic", "Austronesian", "Cariban", "Central_Sudanic", "Chibchan", 
+#                    "Dravidian", "Gunwinyguan", "Indo-European", "Mande", "Mongolic",  
+#                    "Nakh-Daghestanian", "Nilotic", "Nuclear_Torricelli", "Nuclear_Trans_New_Guinea", 
+#                    "Otomanguean", "Pama-Nyungan", "Pano-Tacanan", "Salishan", "Sepik", "Sino-Tibetan",
+#                    "Siouan", "Sko", "Surmic", "Tai-Kadai", "Tucanoan", "Tupian", "Turkic", "Uralic",
+#                    "Uto-Aztecan" )
+lang.fam.names <- c( "full" )
+multi.C <- "_5"
+#multi.C <- ""
+trait.var <- "-0"
+trait.names <- c( "AN", "PN", "ND", "NG", "NNum", "VO", "NRc", "VS" )
+t.pairs <- c()
+
+trait.pairs <- vector(mode="character", length=28)
+values.1 <- vector(mode="numeric", length=28)
+values.2 <- vector(mode="numeric", length=28)
+values.1.log <- vector(mode="numeric", length=28)
+values.2.log <- vector(mode="numeric", length=28)
+j <- 1
+
+for (trait.name.1 in trait.names){
+  for (trait.name.2 in trait.names){
+    pair = paste( trait.name.1, trait.name.2 )
+    
+    if ( (trait.name.1 != trait.name.2) & !(pair %in% t.pairs) ){
+      
+      t.pairs = c( t.pairs, pair, paste(trait.name.2, trait.name.1) )
+      
+      dep.mN = NA
+      indep.mN = NA
+      
+      for ( i in 1:length(lang.fam.names) ){
+        
+        lang <- lang.fam.names[i]
+        
+        # load prepared data as "dat"
+        data.name <- paste( lang, "_" ,trait.name.1, "-", trait.name.2, sep="" )
+        data.file.name <- file.path( dataprep.dir, "dat", lang, 
+                                     paste(data.name, "binom-0_dat.RData", sep="_") )
+        C.file.name <- file.path( dataprep.dir, "dat", lang, 
+                                     paste(lang, "_avgC-5.RData", sep="_") )
+        dat <- list()
+
+        print( paste("--", trait.name.1, "-", trait.name.2, "-", lang, "--") )
+        
+        # doesn't effectively compute bridge samples anymore, just reads alreay computed files
+        dependent <- get.bridge( model=model.1, lang.name=lang, 
+                                 trait.name.1=trait.name.1, trait.name.2=trait.name.2, 
+                                 variant="-lin_", dat=dat, multi.C=multi.C, trait.var=trait.var )
+        independent <- get.bridge( model=model.2, lang.name=lang, 
+                                   trait.name.1=trait.name.1, trait.name.2=trait.name.2, 
+                                   variant="-univ_", dat=dat, multi.C=multi.C, trait.var=trait.var )
+        bayes.factors.1 <- bf(dependent, independent)
+        bayes.factors.2 <- bf(independent, dependent)
+        
+        bayes.factors.1.log <- bf(dependent, independent, log=TRUE)
+        bayes.factors.2.log <- bf(independent, dependent, log=TRUE)
+        
+        print(bayes.factors.1)
+        #print(bayes.factors.2)
+        
+        trait.pairs[j] <- pair
+        values.1[j] <- bayes.factors.1$bf
+        values.2[j] <- bayes.factors.2$bf
+        
+        values.1.log[j] <- bayes.factors.1.log$bf
+        values.2.log[j] <- bayes.factors.2.log$bf
+        j <- j+1
+      }
+    }
+  }
+}
+
+```
+
+```{r plot direct}
+bf.df <- data.frame(trait.pairs=as.factor(trait.pairs), bayes.factors=values.1)
+upper.1 <- bf.df[bf.df$bayes.factors>=1,]
+lower.1 <- bf.df[bf.df$bayes.factors<1,]
+
+ggplot(bf.df) + 
+  geom_col(data=upper.1, aes(x=trait.pairs, y=bayes.factors), fill="green4") +
+  geom_col(data=lower.1, aes(x=trait.pairs, y=bayes.factors), fill="blue4") + 
+  geom_hline(yintercept=1, color="red", size=1.2) +
+  geom_hline(yintercept=5, color="orange", size=1) +
+  geom_hline(yintercept=100, color="yellow", size=1) +
+  scale_y_continuous(trans="log2") +
+  coord_flip() + labs( title=lang, subtitle="lineage over universal" )
+
+
+bf.df.2 <- data.frame(trait.pairs=as.factor(trait.pairs), bayes.factors=values.2)
+upper.1 <- bf.df.2[bf.df.2$bayes.factors>=1,]
+lower.1 <- bf.df.2[bf.df.2$bayes.factors<1,]
+
+ggplot(bf.df.2) + 
+  geom_col(data=upper.1, aes(x=trait.pairs, y=bayes.factors), fill="green4") +
+  geom_col(data=lower.1, aes(x=trait.pairs, y=bayes.factors), fill="blue4") + 
+  geom_hline(yintercept=1, color="red", size=1.2) +
+  geom_hline(yintercept=5, color="orange", size=1) +
+  geom_hline(yintercept=100, color="yellow", size=1) +
+  scale_y_continuous(trans="log2") +
+  coord_flip() + labs( title=lang, subtitle="independent over dependent" )
+```
+
+```{r plot log scale}
+bf.df.log <- data.frame(trait.pairs=as.factor(trait.pairs), bayes.factors=values.1.log)
+upper.1 <- bf.df.log[bf.df.log$bayes.factors>=0,]
+lower.1 <- bf.df.log[bf.df.log$bayes.factors<0,]
+
+ggplot(bf.df.log) + 
+  geom_col(data=upper.1, aes(x=trait.pairs, y=bayes.factors), fill="green4") +
+  geom_col(data=lower.1, aes(x=trait.pairs, y=bayes.factors), fill="blue4") + 
+  geom_hline(yintercept=0, color="red", size=1.2) +
+  coord_flip() + labs( title=lang, subtitle="dependent over independent" ) + 
+  ylab("bayes.factors - log scale")
+
+
+bf.df.log.2 <- data.frame(trait.pairs=as.factor(trait.pairs), bayes.factors=values.2.log)
+upper.1 <- bf.df.log.2[bf.df.log.2$bayes.factors>=0,]
+lower.1 <- bf.df.log.2[bf.df.log.2$bayes.factors<0,]
+
+ggplot(bf.df.log.2) + 
+  geom_col(data=upper.1, aes(x=trait.pairs, y=bayes.factors), fill="green4") +
+  geom_col(data=lower.1, aes(x=trait.pairs, y=bayes.factors), fill="blue4") + 
+  geom_hline(yintercept=0, color="red", size=1.2) +
+  coord_flip() + labs( title=lang, subtitle="independent over dependent" ) + 
+  ylab("bayes.factors - log scale")
+```
+
+```{r dunn plot, fig.height=6, fig.width=6}
+trait.names <- c( "AN", "PN", "ND", "NG", "NNum", "VO", "NRc", "VS" )
+dunn.order <- c("AN", "VS", "ND", "NNum", "NRc", "NG", "VO", "PN")
+bf.mat <- matrix( data=0, nrow=8, ncol=8, dimnames=list(dunn.order, dunn.order) )
+bf.mat["AN","PN"] <- bf.df[1,2] # AN-PN
+bf.mat["AN","ND"] <- bf.df[2,2] # AN-ND
+bf.mat["AN","NG"] <- bf.df[3,2] # AN-NG
+bf.mat["AN","NNum"] <- bf.df[4,2] # AN-NNum
+bf.mat["AN","VO"] <- bf.df[5,2] # AN-VO
+bf.mat["AN","NRc"] <- bf.df[6,2] # AN-NRc
+bf.mat["AN","VS"] <- bf.df[7,2] # AN-VS
+bf.mat["ND","PN"] <- bf.df[8,2] # PN-ND
+bf.mat["NG","PN"] <- bf.df[9,2] # PN-NG
+bf.mat["NNum","PN"] <- bf.df[10,2] # PN-NNum
+bf.mat["VO","PN"] <- bf.df[11,2] # PN-VO
+bf.mat["NRc","PN"] <- bf.df[12,2] # PN-NRc
+bf.mat["VS","PN"] <- bf.df[13,2] # PN-VS
+bf.mat["ND","NG"] <- bf.df[14,2] # ND-NG
+bf.mat["ND","NNum"] <- bf.df[15,2] # ND-NNum
+bf.mat["ND","VO"] <- bf.df[16,2] # ND-VO
+bf.mat["ND","NRc"] <- bf.df[17,2] # ND-NRc
+bf.mat["VS","ND"] <- bf.df[18,2] # ND-VS
+bf.mat["NNum","NG"] <- bf.df[19,2] # NG-NNum
+bf.mat["NG","VO"] <- bf.df[20,2] # NG-VO
+bf.mat["NRc","NG"] <- bf.df[21,2] # NG-NRc
+bf.mat["VS","NG"] <- bf.df[22,2] # NG-VS
+bf.mat["NNum","VO"] <- bf.df[23,2] # NNum-VO
+bf.mat["NNum","NRc"] <- bf.df[24,2] # NNum-NRc
+bf.mat["VS","NNum"] <- bf.df[25,2] # NNum-VS^
+bf.mat["NRc","VO"] <- bf.df[26,2] # VO-NRc
+bf.mat["VS","VO"] <- bf.df[27,2] # VO-VS
+bf.mat["VS","NRc"] <- bf.df[28,2] # NRc-VS
+
+dunn.plot(bf.mat, threshold=5)
+dunn.plot(bf.mat, threshold=5, as.log=TRUE )
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

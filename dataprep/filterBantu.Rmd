@@ -1,0 +1,139 @@
+---
+title: "DataPrep_Bantu"
+output: html_document
+---
+
+```{r sourcce}
+setwd(dirname(getwd()))
+source('paths.R', encoding="utf8")
+source( file.path(post.dir, 'diagnostics.R'), encoding="utf8" )
+source( file.path(fit.dir, 'fit.R'), encoding="utf8" )
+source( file.path(dataprep.dir, 'dataprep.R'), encoding="utf8" )
+```
+
+```{r Atlantic-Congo features, paged.print=FALSE}
+Atlantic_Congo.feats <- read.feats("Atlantic-Congo", bin=TRUE, other=0)
+Atlantic_Congo.feats
+```
+
+```{r filter Bantu, paged.print=FALSE}
+Atlantic_Congo.feats$X_sub <- sapply( 
+  Atlantic_Congo.feats$X, function(x) strsplit(x, ".", fixed=TRUE)[[1]][2] )
+Atlantic_Congo.feats$X_lang <- sapply( 
+  Atlantic_Congo.feats$X, function(x) strsplit(x, ".", fixed=TRUE)[[1]][3] )
+Bantoid.feats <- Atlantic_Congo.feats[Atlantic_Congo.feats$X_sub=="BANTOID",]
+
+NarrowBantu.Bantoid <- c("SHONA", "RUNYANKORE_RUKIGA", "A72a_EWONDO", "SWAHILI", "LOMONGO", 
+                         "NKORE_KIGA", "NDONGA_2", "CHINGONI", "KWANGALI_2", "PARE_TANZANIA",
+                         "K14_LWENA_2", "LUNDA_1", "CEWA", "XHOSA_2", "LUGANDA", "BASAA",  
+                         "BATANGE_BALUNDU", "M64_TONGA_2", "NDUMU_2", "ZULU_2", "IWUM_WUUMBU_2", 
+                         "HAYA", "HUNDE", "SOTHO_SUD", "ISANGU", "L21_KETE_IPILA", "ILA", "KITABWA", 
+                         "PHUTI", "RONGA", "BAKUERI", "KOONGO", "GIKUYU_2", "KINYAMWEZI", "TETELA",
+                         "C831_ILEBO", "NGELEMA_2", "L32_KANYOK_1", "MBOSHI_NGOLO", "G65_KINGA",
+                         "KONGO_SAN_SALVADOR_2", "KINYARWANDA", "D28_HOLOHOLO", "HEMBA_BWINYANYEMBA",
+                         "OYUOMI_TCHERRE", "KAGULU", "BAFIA_ROPE", "DZEKE_DIBOLE", "MWERA")
+Bantu.feats <- Bantoid.feats[Bantoid.feats$X_lang %in% NarrowBantu.Bantoid,]
+Bantu.feats
+Bantu.fullNames <- Bantu.feats$X
+```
+
+
+## language family tree data
+
+```{r Filter Bantu trees, fig.height=9, fig.width=8}
+Atlantic_Congo.trees <- ape::read.tree(
+  file.path( data.dir, "trees", separator, "Atlantic-Congo.posterior.tree") )
+Bantu.trees <- lapply(Atlantic_Congo.trees, function(tree) ape::keep.tip(tree, Bantu.feats$X))
+plot(Bantu.trees[[1]])
+```
+
+average correlation matrix for trees:
+
+```{r correlation matrices, warning=FALSE}
+Bantu.C <- list()
+nrc <- length(Bantu.trees[[1]]$tip.label)
+sum.Bantu <- matrix(data=rep(0, nrc*nrc),  nrow=nrc, ncol=nrc)
+for ( i in 1:length( Bantu.trees ) ){
+  suppressWarnings({
+    tree <- Bantu.trees[[i]]
+    tree.C <- ape::vcv( ape::corBrownian(1, tree), corr=FALSE )
+    Bantu.C[[i]] <- tree.C[Bantu.fullNames, Bantu.fullNames]
+  })
+  sum.Bantu = sum.Bantu + Bantu.C[[i]]
+}
+avg.Bantu = sum.Bantu / length( Bantu.trees )
+
+n_avg <- 5
+nC <- length(Bantu.trees)
+n.split <- ceiling(nC/n_avg)
+tree.splits <- split(Bantu.trees, rep(1:ceiling(nC/n.split), each=n.split, length.out=nC))
+avg.Cs <- list()
+  
+for ( h in 1:length(tree.splits) ) {
+  tree.split <- tree.splits[[h]]
+  
+  nrc <- length(tree.split[[1]]$tip.label)
+  sum.C <- matrix(data=rep(0, nrc*nrc),  nrow=nrc, ncol=nrc)
+  for ( i in 1:length( tree.split ) ) {
+    suppressWarnings({
+      tree <- tree.split[[i]]
+      C.i <- ape::vcv( ape::corBrownian(1, tree), corr=FALSE )[Bantu.fullNames, Bantu.fullNames]
+    })
+    sum.C = sum.C + C.i
+  }
+  avg.Cs[[h]] = sum.C / length( tree.split )
+}
+lang.C <- avg.Cs
+save( lang.C, file=file.path("dat", "Bantu", "Bantu_avgC-5.RData") )
+
+max.C <- 100
+if ( length(Bantu.C)>1 & max.C<length(Bantu.C) ) {
+  set.seed(1)
+  Bantu.C <- sample( Bantu.C, max.C )
+  set.seed(NULL)
+}
+lang.C <- Bantu.C
+save( lang.C, file=file.path("dat", "Bantu", "Bantu_multiC-100.RData") )
+lang.C <- avg.Bantu
+save( lang.C, file=file.path("dat", "Bantu", "Bantu_avgC.RData") )
+```
+
+
+```{r save}
+trait.names <- c( "AN", "PN", "ND", "NG", "NNum", "VO", "NRc", "VS" )
+for (trait.name.1 in trait.names){
+  for (trait.name.2 in trait.names){
+    
+    cat("\n--", trait.name.1, " - ", trait.name.2, "--\n")
+    
+    trait.1 <- as.numeric( unlist(Bantu.feats[trait.name.1]) )
+    trait.2 <- as.numeric( unlist(Bantu.feats[trait.name.2]) )
+    traits <- c(trait.1, trait.2)
+    
+    cat(traits)
+    
+    dat <- list(
+      N = length(traits)/2,
+      x = traits,
+      M = length(Bantu.C),
+      #C = Bantu.C,
+      dMat = designMatrix(length(traits)/2, 2),
+      # Hyperparameters
+      eta = 0.8,
+      lambda = 1,
+      mu_z = 0,
+      sigma_z = 1.5
+    )
+        
+    # setup save
+    save.dir <- file.path("dat", "Bantu")
+    if (!dir.exists(save.dir)) { dir.create(save.dir) }
+        
+    data.name <- paste( "Bantu_" ,trait.name.1, "-", trait.name.2, sep="" )
+    file.name <- file.path( paste(data.name, "binom-0_dat.RData", sep="_") )
+          
+    save( dat, file=file.path(save.dir, file.name) )
+  }
+}
+```
+

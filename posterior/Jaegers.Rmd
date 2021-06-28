@@ -1,0 +1,262 @@
+---
+title: "Jäger Comparison"
+output: html_document
+---
+
+```{r setup}
+library(ggplot2)
+library(ggpubr)
+setwd(dirname(getwd()))
+source('paths.R', encoding="utf8" )
+source( file.path(post.dir, 'diagnostics.R'), encoding="utf8" )
+```
+
+```{r load bfmats, paged.print=FALSE}
+# from Jäger(2018)
+# universal correlations
+load("rDats/full_avgC-5_0_bfdf.RData")
+bf.df.full.5.0$Jaeger <- c(
+  -17, 5.4, -23.2, -5.8, -22, 41.6, -12.3, -5.3, 47.2, -28.2, 58.1, 17.7, 23.6, -5.7, 
+  20.6, -12.8, 17.4, -18.6, -34.1, 36.9, 21.9, 13.7, -45.4, -15.7, -37.6, 18.1, 12.1, 14.5
+  )
+# universal independence
+load("rDats/full_dep_avgC-5_0_bfdf.RData")
+bf.df.full.dep.5.0$Jaeger <- c(
+  0.3, 64.9, 12.2, 93.3, -1.0, 48.5, -0.3, 15.0, 115.7, 13.5, 104.8, 22.6, 31.3, 23.5, 
+  99.6, 15.4, 33.5, -1.2, 16.5, 68.0, 23.8, 41.1, 7.6, 5.0, 14.4, 35.3, 38.2, 6.8
+  )
+load("rDats/full_dep_avgC-5_0_loocdf.RData")
+bf.df.full.dep.5.0$looc <- looc.df.full.dep.5.0$loocs
+load("rDats/full_dep_avgC-5_0_wWaicdf.RData")
+bf.df.full.dep.5.0$wWaic <- waic.W.F.dep.5.0.df$WAIC.weight[waic.W.F.dep.5.0.df$model=="dependent"]
+bf.df.full.dep.5.0
+```
+
+```{r Dryer, fig.height=6, fig.width=6}
+# "AN", "VS", "ND", "NNum", "NRC", "NG", "VO", "PN"
+dryer <- t(matrix(c(           0, 0, 0, 0, 0, 0, 0, 0,
+                0.0,              0, 0, 0, 0, 0, 0, 0,
+                0.0, 0.0,            0, 0, 0, 0, 0, 0,
+                0.0, 0.0, 0.0,          0, 0, 0, 0, 0,
+                0.0, 0.0, 0.0, 0.0,        0, 0, 10.1, 0,
+                0.0, 0.0, 0.0, 0.0, 0.0,      0, 10.1, 0,
+                0.0, 0.0, 0.0, 0.0, 10.1, 10.1,  0, 10.1,
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 10.1, 0), 
+                nrow=8, byrow=TRUE))
+dunn.plot(t(dryer), threshold=5, max.width=10 )
+```
+
+
+```{r universal mat, fig.height=6, fig.width=6}
+trait.names <- c( "AN", "PN", "ND", "NG", "NNum", "VO", "NRc", "VS" )
+dunn.order <- c("AN", "VS", "ND", "NNum", "NRc", "NG", "VO", "PN")
+bf.mat.univ <- matrix( data=0, nrow=8, ncol=8, dimnames=list(dunn.order, dunn.order) )
+bf.mat.univ["AN","PN"] <- bf.df.2[1,2] # AN-PN
+bf.mat.univ["AN","ND"] <- bf.df.2[2,2] # AN-ND
+bf.mat.univ["AN","NG"] <- bf.df.2[3,2] # AN-NG
+bf.mat.univ["AN","NNum"] <- bf.df.2[4,2] # AN-NNum
+bf.mat.univ["AN","VO"] <- bf.df.2[5,2] # AN-VO
+bf.mat.univ["AN","NRc"] <- bf.df.2[6,2] # AN-NRc
+bf.mat.univ["AN","VS"] <- bf.df.2[7,2] # AN-VS
+bf.mat.univ["ND","PN"] <- bf.df.2[8,2] # PN-ND
+bf.mat.univ["NG","PN"] <- bf.df.2[9,2] # PN-NG
+bf.mat.univ["NNum","PN"] <- bf.df.2[10,2] # PN-NNum
+bf.mat.univ["VO","PN"] <- bf.df.2[11,2] # PN-VO
+bf.mat.univ["NRc","PN"] <- bf.df.2[12,2] # PN-NRc
+bf.mat.univ["VS","PN"] <- bf.df.2[13,2] # PN-VS
+bf.mat.univ["ND","NG"] <- bf.df.2[14,2] # ND-NG
+bf.mat.univ["ND","NNum"] <- bf.df.2[15,2] # ND-NNum
+bf.mat.univ["ND","VO"] <- bf.df.2[16,2] # ND-VO
+bf.mat.univ["ND","NRc"] <- bf.df.2[17,2] # ND-NRc
+bf.mat.univ["VS","ND"] <- bf.df.2[18,2] # ND-VS
+bf.mat.univ["NNum","NG"] <- bf.df.2[19,2] # NG-NNum
+bf.mat.univ["NG","VO"] <- bf.df.2[20,2] # NG-VO
+bf.mat.univ["NRc","NG"] <- bf.df.2[21,2] # NG-NRc
+bf.mat.univ["VS","NG"] <- bf.df.2[22,2] # NG-VS
+bf.mat.univ["NNum","VO"] <- bf.df.2[23,2] # NNum-VO
+bf.mat.univ["NNum","NRc"] <- bf.df.2[24,2] # NNum-NRc
+bf.mat.univ["VS","NNum"] <- bf.df.2[25,2] # NNum-VS^
+bf.mat.univ["NRc","VO"] <- bf.df.2[26,2] # VO-NRc
+bf.mat.univ["VS","VO"] <- bf.df.2[27,2] # VO-VS
+bf.mat.univ["VS","NRc"] <- bf.df.2[28,2] # NRc-VS
+
+dunn.plot(bf.mat.univ, threshold=10, max.width=5, comp.corr=dryer )
+
+bf.mat.univ <- bf.mat.univ[c(1, 3, 4, 5, 7, 2, 8, 6),
+                           c(1, 3, 4, 5, 7, 2, 8, 6)]
+for (i in 1:8) {
+  for (j in 1:8) {
+    if (bf.mat.univ[i,j]>0){
+      bf.mat.univ[j,i] = bf.mat.univ[i,j]
+    }
+    if (bf.mat.univ[j,i]>0){
+      bf.mat.univ[i,j] = bf.mat.univ[j,i]
+    }
+  }
+}
+
+dunn.plot(bf.mat.univ, threshold=10, max.width=5, outline="jaeger" )
+```
+
+```{r, fig.height=6, fig.width=6}
+# intersection where bf>5 waic weights>0.6 (and dElpd>0)
+trait.names <- c( "AN", "PN", "ND", "NG", "NNum", "VO", "NRc", "VS" )
+dunn.order <- c("AN", "VS", "ND", "NNum", "NRc", "NG", "VO", "PN")
+inter.mat.univ.dep <- matrix( data=0, nrow=8, ncol=8, dimnames=list(dunn.order, dunn.order) )
+inter.mat.univ.dep["AN","PN"] <- ifelse(
+  (bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="AN PN", "wWaic"]>0.6
+   && bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="AN PN", "looc"]>0), bf.df.full.dep.5.0[1,2], 0) # AN-PN
+inter.mat.univ.dep["AN","ND"] <- ifelse(
+  (bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="AN ND", "wWaic"]>0.6
+   && bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="AN ND", "looc"]>0), bf.df.full.dep.5.0[2,2], 0) # AN-ND
+inter.mat.univ.dep["AN","NG"] <- ifelse(
+  (bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="AN NG", "wWaic"]>0.6
+   && bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="AN NG", "looc"]>0), bf.df.full.dep.5.0[3,2], 0) # AN-NG
+inter.mat.univ.dep["AN","NNum"] <- ifelse(
+  (bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="AN NNum", "wWaic"]>0.6
+   && bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="AN NNum", "looc"]>0), bf.df.full.dep.5.0[4,2], 0) # AN-NNum
+inter.mat.univ.dep["AN","VO"] <- ifelse(
+  (bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="AN VO", "wWaic"]>0.6
+   && bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="AN VO", "looc"]>0), bf.df.full.dep.5.0[5,2], 0) # AN-VO
+inter.mat.univ.dep["AN","NRc"] <- ifelse(
+  (bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="AN NRc", "wWaic"]>0.6
+   && bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="AN NRc", "looc"]>0), bf.df.full.dep.5.0[6,2], 0) # AN-NRc
+inter.mat.univ.dep["AN","VS"] <- ifelse(
+  (bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="AN VS", "wWaic"]>0.6
+   && bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="AN VS", "looc"]>0), bf.df.full.dep.5.0[7,2], 0) # AN-VS
+inter.mat.univ.dep["ND","PN"] <- ifelse(
+  (bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="PN ND", "wWaic"]>0.6
+   && bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="PN ND", "looc"]>0), bf.df.full.dep.5.0[8,2], 0) # PN-ND
+inter.mat.univ.dep["NG","PN"] <- ifelse(
+  (bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="PN NG", "wWaic"]>0.6
+   && bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="PN NG", "looc"]>0), bf.df.full.dep.5.0[9,2], 0) # PN-NG
+inter.mat.univ.dep["NNum","PN"] <- ifelse(
+  (bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="PN NNum", "wWaic"]>0.6
+   && bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="PN NNum", "looc"]>0), bf.df.full.dep.5.0[10,2], 0) # PN-NNum
+inter.mat.univ.dep["VO","PN"] <- ifelse(
+  (bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="PN VO", "wWaic"]>0.6
+   && bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="PN VO", "looc"]>0), bf.df.full.dep.5.0[11,2], 0) # PN-VO
+inter.mat.univ.dep["NRc","PN"] <- ifelse(
+  (bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="PN NRc", "wWaic"]>0.6
+   && bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="PN NRc", "looc"]>0), bf.df.full.dep.5.0[12,2], 0) # PN-NRc
+inter.mat.univ.dep["VS","PN"] <- ifelse(
+  (bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="PN VS", "wWaic"]>0.6
+   && bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="PN VS", "looc"]>0), bf.df.full.dep.5.0[13,2], 0) # PN-VS
+inter.mat.univ.dep["ND","NG"] <- ifelse(
+  (bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="ND NG", "wWaic"]>0.6
+   && bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="ND NG", "looc"]>0), bf.df.full.dep.5.0[14,2], 0) # ND-NG
+inter.mat.univ.dep["ND","NNum"] <- ifelse(
+  (bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="ND NNum", "wWaic"]>0.6
+   && bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="ND NNum", "looc"]>0), bf.df.full.dep.5.0[15,2], 0) # ND-NNum
+inter.mat.univ.dep["ND","VO"] <- ifelse(
+  (bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="ND VO", "wWaic"]>0.6
+   && bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="ND VO", "looc"]>0), bf.df.full.dep.5.0[16,2], 0) # ND-VO
+inter.mat.univ.dep["ND","NRc"] <- ifelse(
+  (bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="ND NRc", "wWaic"]>0.6
+   && bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="ND NRc", "looc"]>0), bf.df.full.dep.5.0[17,2], 0) # ND-NRc
+inter.mat.univ.dep["VS","ND"] <- ifelse(
+  (bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="ND VS", "wWaic"]>0.6
+   && bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="ND VS", "looc"]>0), bf.df.full.dep.5.0[18,2], 0) # ND-VS
+inter.mat.univ.dep["NNum","NG"] <- ifelse(
+  (bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="NG NNum", "wWaic"]>0.6
+   && bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="NG NNum", "looc"]>0), bf.df.full.dep.5.0[19,2], 0) # NG-NNum
+inter.mat.univ.dep["NG","VO"] <- ifelse(
+  (bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="NG VO", "wWaic"]>0.6
+   && bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="NG VO", "looc"]>0), bf.df.full.dep.5.0[20,2], 0) # NG-VO
+inter.mat.univ.dep["NRc","NG"] <- ifelse(
+  (bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="NG NRc", "wWaic"]>0.6
+   && bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="NG NRc", "looc"]>0), bf.df.full.dep.5.0[21,2], 0) # NG-NRc
+inter.mat.univ.dep["VS","NG"] <- ifelse(
+  (bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="NG VS", "wWaic"]>0.6
+   && bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="NG VS", "looc"]>0), bf.df.full.dep.5.0[22,2], 0) # NG-VS
+inter.mat.univ.dep["NNum","VO"] <- ifelse(
+  (bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="NNum VO", "wWaic"]>0.6
+   && bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="NNum VO", "looc"]>0), bf.df.full.dep.5.0[23,2], 0) # NNum-VO
+inter.mat.univ.dep["NNum","NRc"] <- ifelse(
+  (bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="NNum NRc", "wWaic"]>0.6
+   && bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="NNum NRc", "looc"]>0), bf.df.full.dep.5.0[24,2], 0) # NNum-NRc
+inter.mat.univ.dep["VS","NNum"] <- ifelse(
+  (bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="NNum VS", "wWaic"]>0.6
+   && bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="NNum VS", "looc"]>0), bf.df.full.dep.5.0[25,2], 0) # NNum-VS
+inter.mat.univ.dep["NRc","VO"] <- ifelse(
+  (bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="VO NRc", "wWaic"]>0.6
+   && bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="VO NRc", "looc"]>0), bf.df.full.dep.5.0[26,2], 0) # VO-NRc
+inter.mat.univ.dep["VS","VO"] <- ifelse(
+  (bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="VO VS", "wWaic"]>0.6
+   && bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="VO VS", "looc"]>0), bf.df.full.dep.5.0[27,2], 0) # VO-VS
+inter.mat.univ.dep["VS","NRc"] <- ifelse(
+  (bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="NRc VS", "wWaic"]>0.6
+   && bf.df.full.dep.5.0[bf.df.full.dep.5.0$trait.pairs=="NRc VS", "looc"]>0), bf.df.full.dep.5.0[28,2], 0) # NRc-VS
+
+# reorder to fit 'new' outline:
+inter.mat.univ.dep <- inter.mat.univ.dep[c(1, 3, 4, 5, 7, 2, 8, 6),
+                                         c(1, 3, 4, 5, 7, 2, 8, 6)]
+dryer.2 <- dryer[c(1, 3, 4, 5, 7, 2, 8, 6),
+                 c(1, 3, 4, 5, 7, 2, 8, 6)]
+for (i in 1:8) {
+  for (j in 1:8) {
+    if (inter.mat.univ.dep[i,j]>0){
+      inter.mat.univ.dep[j,i] = inter.mat.univ.dep[i,j]
+    }
+    if (inter.mat.univ.dep[j,i]>0){
+      inter.mat.univ.dep[i,j] = inter.mat.univ.dep[j,i]
+    }
+  }
+}
+# Figure 22:
+dunn.plot(inter.mat.univ.dep, threshold=10, max.width=10, outline="new", comp.corr=dryer.2 )
+```
+
+```{r compare, fig.height=7, fig.width=7}
+dunn.plot(Jaegers.mat.univ, threshold=10, comp.corr=bf.mat.univ, max.width=5, outline="jaeger", fit.colour="green1" ) + 
+  labs(title="Jäger's universal correlations",
+       subtitle="compared to avgC-5")
+
+dunn.plot(Jaegers.mat.dep, threshold=10, comp.corr=bf.mat.univ.dep, max.width=5, outline="jaeger", fit.colour="green1" ) + 
+  labs(title="Jäger's universal correlations",
+       subtitle="compared to avgC-5 - dependencies")
+```
+
+```{r scatter - deps, fig.height=5, fig.width=10}
+bf.df.full.dep.5.0$bayes.factors.2 <- bf.df.full.dep.5.0$bayes.factors
+bf.df.full.dep.5.0$Jaeger.2 <- bf.df.full.dep.5.0$Jaeger
+bf.df.full.dep.5.0$bayes.factors.2[bf.df.full.dep.5.0$bayes.factors.2<1] <- - 1 /
+                                                  bf.df.full.dep.5.0$bayes.factors.2[bf.df.full.dep.5.0$bayes.factors.2<1]
+bf.df.full.dep.5.0$Jaeger.2[bf.df.full.dep.5.0$Jaeger.2<0] <- - 1 /
+                                                  bf.df.full.dep.5.0$Jaeger.2[bf.df.full.dep.5.0$Jaeger.2<0]
+
+p.1 <- ggplot(bf.df.full.dep.5.0) + 
+  geom_abline(intercept=0, slope=1, color="grey", lwd=2) + 
+  geom_point(mapping=aes(x=Jaeger, y=bayes.factors.2), color="black") +
+  geom_smooth(mapping=aes(x=Jaeger, y=bayes.factors.2), method=lm, color="black", se=FALSE) + 
+  scale_y_continuous(breaks=c(1, 1e65, 2e65, 3e65), 
+                     labels=c("1", "1e65", "2e65", "3e65") ) +
+  labs( title="Universal" ) + xlab("Bayes Factor (Jäger)") + ylab("Bayes Factor")
+p.2 <- p.1 + scale_y_continuous(trans="pseudo_log", name="Bayes Factor - pseudo_log", 
+                                breaks=c(-1e30, -1e10, -100, 100, 1e10, 1e30, 3e65), 
+                                labels=c("-1e30", "-1e10", "-100", "100", "1e10", "1e30", "3e65")) + 
+  labs( title="" )
+p.3 <- p.2 + scale_x_continuous(trans="pseudo_log", name="Bayes Factor (Jäger) - pseudo_log", 
+                                breaks=c(-1, 1, 5, 10, 50, 100), 
+                                labels=c("-1", "1", "5", "10", "50", "100")) + 
+  labs( title="" )
+
+p.1.b <- ggplot(bf.df.full.dep.5.0) + 
+  geom_abline(intercept=0, slope=1, color="grey", lwd=2) + 
+  geom_point(mapping=aes(x=Jaeger.2, y=bayes.factors), color="black") +
+  geom_smooth(mapping=aes(x=Jaeger.2, y=bayes.factors), method=lm, color="black", se=FALSE) + 
+  labs( title="Universal" ) + xlab("Bayes Factor (Jäger)")
+p.2.b <- p.1.b + scale_y_continuous(trans="log2", name="Bayes Factor - log2")
+p.3.b <- p.2.b + scale_x_continuous(trans="log2", name="Bayes Factor (Jäger) - log2")
+```
+```{r fig.height=6, fig.width=6}
+# Figure 18:
+p.3 + labs(title="Comparison to Jäger(2018)", subtitle="correlation against independence" ) +
+  theme(text = element_text(size = 18))
+```
+
+
+
+
+
+

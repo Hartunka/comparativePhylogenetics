@@ -1,0 +1,172 @@
+---
+title: "full results"
+output: html_document
+---
+
+```{r setup}
+library(ggplot2)
+library(ggpubr)
+setwd(dirname(getwd()))
+source('paths.R', encoding="utf8" )
+source( file.path(post.dir, 'diagnostics.R'), encoding="utf8" )
+```
+
+```{r full}
+load( file.path(post.dir, "rDats", "full_avgC-5_0_bfdf.RData") )
+load( file.path(post.dir, "rDats", "full_avgC-5_0_loocdf.RData") )
+load( file.path(post.dir, "rDats", "full_avgC-5_0_waicdf.RData") )
+load( file.path(post.dir, "rDats", "full_avgC-5_0_wWaicdf.RData") )
+load( file.path(post.dir, "rDats", "full_dep_avgC-5_0_bfdf.RData") )
+load( file.path(post.dir, "rDats", "full_dep_avgC-5_0_loocdf.RData") )
+load( file.path(post.dir, "rDats", "full_dep_avgC-5_0_waicdf.RData") )
+load( file.path(post.dir, "rDats", "full_dep_avgC-5_0_wWaicdf.RData") )
+
+bf.df.full.5.0$bayes.factors <- 1 / bf.df.full.5.0$bayes.factors
+looc.df.full.5.0$loocs <- - looc.df.full.5.0$loocs
+waic.df.full.dep.5.0 <- waic.F.dep.5.0.df
+waic.W.df.full.dep.5.0.df <- waic.W.F.dep.5.0.df
+lang <- "full"
+```
+
+```{r plot bf}
+upper.1 <- bf.df.full.5.0[bf.df.full.5.0$bayes.factors>=1,]
+lower.1 <- bf.df.full.5.0[bf.df.full.5.0$bayes.factors<1,]
+
+b <- c(1, 1e25, 1e60, 1e90, 1e120)
+#b.b <- c(1/b, b)
+#l <- c(as.character(-b), as.character(b))
+l <- as.character(b)
+p.full.avgC.bf <- ggplot(bf.df.full.5.0) + 
+  geom_col(data=upper.1, aes(x=trait.pairs, y=bayes.factors), fill="green4") +
+  geom_col(data=lower.1, aes(x=trait.pairs, y=bayes.factors), fill="blue4") + 
+  geom_hline(yintercept=1, color="red", size=1.2) +
+  geom_hline(yintercept=10, color="yellow", size=1) +
+  scale_y_continuous(trans="log2", breaks=b, labels=l ) +
+  theme(text = element_text(size=17)) +
+  coord_flip()  + labs( title="universally correlated", subtitle=" - against lineage-specific" ) +
+  ylab("Bayes Factors") + xlab("trait pairs")
+
+p.full.avgC.bf
+```
+
+```{r plot looc}
+upper.0 <- looc.df.full.5.0[looc.df.full.5.0$loocs>=0,]
+lower.0 <- looc.df.full.5.0[looc.df.full.5.0$loocs<0,]
+
+p.full.avgC.looc <- ggplot(looc.df.full.5.0) + 
+  geom_col(data=upper.0, aes(x=trait.pairs, y=loocs), fill="green4") +
+  geom_col(data=lower.0, aes(x=trait.pairs, y=loocs), fill="blue4") + 
+  geom_hline(yintercept=0, color="red", size=1.2) +
+  #scale_y_continuous(trans="pseudo_log")+#, breaks=c(1/1.01, 1, 1.01), labels=c("-1.01", "1", "1.01") ) + 
+  theme(text = element_text(size=17), axis.title.y=element_blank()) +
+  coord_flip() + labs( title="", subtitle="" ) +
+  ylab("looic - elpd diff")
+
+p.full.avgC.looc
+```
+
+```{r plot waic}
+upper.0 <- waic.df.full.5.0[waic.df.full.5.0$dWAIC>=0,]
+lower.0 <- waic.df.full.5.0[waic.df.full.5.0$dWAIC<0,]
+
+p.full.avgC.waic <- ggplot(waic.df.full.5.0) + 
+  geom_col(data=upper.0, aes(x=trait.pairs, y=dWAIC), fill="green4") +
+  geom_col(data=lower.0, aes(x=trait.pairs, y=dWAIC), fill="blue4") + 
+  geom_hline(yintercept=0, color="red", size=1.2) +
+  #scale_y_continuous(trans="pseudo_log")+#, breaks=c(1/1.01, 1, 1.01), labels=c("-1.01", "1", "1.01") ) + 
+  theme(text = element_text(size=17)) +
+  coord_flip() + labs( title="", subtitle="" ) +
+  ylab("dWAIC")
+
+p.full.avgC.waic
+```
+
+```{r plot waic weights}
+upper.05 <- waic.W.df.full.5.0.df[waic.W.df.full.5.0.df$model=="universal" & waic.W.df.full.5.0.df$WAIC.weight>0.5,]
+lower.05 <- waic.W.df.full.5.0.df[waic.W.df.full.5.0.df$model=="universal" & waic.W.df.full.5.0.df$WAIC.weight<=0.5,]
+
+p.full.avgC.waic.w <- ggplot(waic.W.df.full.5.0.df) + 
+  geom_col(data=upper.05, aes(x=trait.pairs, y=WAIC.weight), fill="green4") +
+  geom_col(data=lower.05, aes(x=trait.pairs, y=WAIC.weight), fill="blue4") + 
+  geom_hline(yintercept=0.5, color="red", size=1) +
+  coord_flip(ylim=c(0.5,max(upper.05$WAIC.weight))) + labs( title="", subtitle="" ) +
+  theme(text = element_text(size=17), axis.title.y=element_blank()) +
+  ylab("waic - weights")
+
+p.full.avgC.waic.w
+```
+
+```{r grid stuff, fig.height=6, fig.width=16}
+# Figure 16:
+full.grid <- ggarrange(p.full.avgC.bf, p.full.avgC.looc, p.full.avgC.waic.w,
+                     vjust=41, widths=c(1, 0.95, 0.95), 
+                     ncol=3)
+full.grid
+```
+
+
+```{r plot bf dependencies, fig.height=6, fig.width=16}
+upper.1 <- bf.df.full.dep.5.0[bf.df.full.dep.5.0$bayes.factors>=1,]
+lower.1 <- bf.df.full.dep.5.0[bf.df.full.dep.5.0$bayes.factors<1,]
+
+b <- c(1, 10, 1e25, 1e50, 1e75, 1e100, 1e120)
+#b.b <- c(1/b, b)
+#l <- c(as.character(-b), as.character(b))
+l <- as.character(b)
+p.full.dep.avgC.bf <- ggplot(bf.df.full.dep.5.0) + 
+  geom_col(data=upper.1, aes(x=trait.pairs, y=bayes.factors), fill="green4") +
+  geom_col(data=lower.1, aes(x=trait.pairs, y=bayes.factors), fill="blue4") + 
+  geom_hline(yintercept=1, color="red", size=1.2) +
+  geom_hline(yintercept=10, color="yellow", size=1) +
+  scale_y_continuous(trans="log2", breaks=c(1/1e50, 1/1e25, 1, 1e25, 1e50), labels=c("-1e50", "-1e25", "1", "1e25", "1e50") ) +
+  theme(text = element_text(size=17)) +
+  coord_flip()  + labs( title="universally correlated", subtitle=" - against independent" ) +
+  ylab("Bayes Factors") + xlab("trait pairs")
+
+upper.0 <- looc.df.full.dep.5.0[looc.df.full.dep.5.0$loocs>=0,]
+lower.0 <- looc.df.full.dep.5.0[looc.df.full.dep.5.0$loocs<0,]
+
+p.full.dep.avgC.looc <- ggplot(looc.df.full.dep.5.0) + 
+  geom_col(data=upper.0, aes(x=trait.pairs, y=loocs), fill="green4") +
+  geom_col(data=lower.0, aes(x=trait.pairs, y=loocs), fill="blue4") + 
+  geom_hline(yintercept=0, color="red", size=1.2) +
+  #scale_y_continuous(trans="pseudo_log")+#, breaks=c(1/1.01, 1, 1.01), labels=c("-1.01", "1", "1.01") ) + 
+  theme(text = element_text(size=17), axis.title.y=element_blank()) +
+  coord_flip() + labs( title="", subtitle="" ) +
+  ylab("looic - elpd diff")
+
+upper.0 <- waic.df.full.dep.5.0[waic.df.full.dep.5.0$dWAIC>=0,]
+lower.0 <- waic.df.full.dep.5.0[waic.df.full.dep.5.0$dWAIC<0,]
+
+p.full.dep.avgC.waic <- ggplot(waic.df.full.dep.5.0) + 
+  geom_col(data=upper.0, aes(x=trait.pairs, y=dWAIC), fill="green4") +
+  geom_col(data=lower.0, aes(x=trait.pairs, y=dWAIC), fill="blue4") + 
+  geom_hline(yintercept=0, color="red", size=1.2) +
+  #scale_y_continuous(trans="pseudo_log")+#, breaks=c(1/1.01, 1, 1.01), labels=c("-1.01", "1", "1.01") ) + 
+  theme(text = element_text(size=17), axis.title.y=element_blank()) +
+  coord_flip() + labs( title="", subtitle="" ) +
+  ylab("dWAIC")
+
+upper.05 <- waic.W.df.full.dep.5.0.df[waic.W.df.full.dep.5.0.df$model=="dependent" & waic.W.df.full.dep.5.0.df$WAIC.weight>0.5,]
+lower.05 <- waic.W.df.full.dep.5.0.df[waic.W.df.full.dep.5.0.df$model=="dependent" & waic.W.df.full.dep.5.0.df$WAIC.weight<=0.5,]
+
+p.full.dep.avgC.waic.w <- ggplot(waic.W.df.full.dep.5.0.df) + 
+  geom_col(data=upper.05, aes(x=trait.pairs, y=WAIC.weight), fill="green4") +
+  geom_col(data=lower.05, aes(x=trait.pairs, y=WAIC.weight), fill="blue4") + 
+  geom_hline(yintercept=0.5, color="red", size=1) +
+  coord_flip(ylim=c(min(lower.05$WAIC.weight),max(upper.05$WAIC.weight))) + labs( title="", subtitle="" ) +
+  theme(text = element_text(size=17), axis.title.y=element_blank()) +
+  ylab("waic - weights")
+
+#Figure 17:
+full.grid <- ggarrange(p.full.dep.avgC.bf, p.full.dep.avgC.looc, p.full.dep.avgC.waic.w,
+                     vjust=41, widths=c(1,0.95,0.95), 
+                     ncol=3)
+full.grid
+```
+
+
+
+
+
+

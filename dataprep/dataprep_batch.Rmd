@@ -1,0 +1,113 @@
+---
+title: "dataprep_batch"
+output: html_document
+---
+
+```{r sourcce, message=FALSE, warning=FALSE}
+setwd(dirname(getwd()))
+source('paths.R', encoding="utf8" )
+source( file.path(fit.dir, 'fit.R'), encoding="utf8" )
+source( file.path(dataprep.dir, 'dataprep.R'), encoding="utf8" )
+```
+
+Prepare data to save as .RData files for easier reading when fitting models
+(eventually not more efficient than just reading data directly whithout intermediate saving)
+
+```{r load data}
+lang.fam.names <- c( "Afro-Asiatic", "Algic", "Arawakan", "Athapaskan-Eyak-Tlingit", "Atlantic-Congo",
+                    "Austroasiatic", "Austronesian", "Cariban", "Central_Sudanic", "Chibchan", 
+                    "Dravidian", "Gunwinyguan", "Indo-European", "Mande", "Mongolic",  
+                    "Nakh-Daghestanian", "Nilotic", "Nuclear_Torricelli", "Nuclear_Trans_New_Guinea", 
+                    "Otomanguean", "Pama-Nyungan", "Pano-Tacanan", "Salishan", "Sepik", "Sino-Tibetan",
+                    "Siouan", "Sko", "Surmic", "Tai-Kadai", "Tucanoan", "Tupian", "Turkic", "Uralic",
+                    "Uto-Aztecan" )
+lang.names <- lapply(lang.fam.names, function(x) c())
+lang.N <- lapply(lang.fam.names, function(x) 0)
+trait.names <- c( "AN", "PN", "ND", "NG", "NNum", "VO", "NRc", "VS" )
+t.pairs <- c()
+
+seed <- 1
+
+for (trait.name.1 in trait.names){
+  for (trait.name.2 in trait.names){
+    pair = paste( trait.name.1, trait.name.2 )
+    
+    if ( (trait.name.1 != trait.name.2) & !(pair %in% t.pairs) ){
+      print( paste("---", trait.name.1, "-", trait.name.2) )
+      
+      t.pairs = c( t.pairs, pair, paste(trait.name.2, trait.name.1) )
+      
+      for ( i in 1:length(lang.fam.names) ){
+        
+        lang <- lang.fam.names[i]
+        
+        print( paste("--", lang) )
+        # setup save
+        save.dir <- file.path("dat", lang)
+        if (!dir.exists(save.dir)) { dir.create(save.dir) }
+        data.name <- paste( lang, "_" ,trait.name.1, "-", trait.name.2, sep="" )
+        
+        file.name.C <- file.path( save.dir, paste(lang, "_avgC-5.RData", sep="_") )
+        if (!file.exists(file.name.C)){
+          lang.data <- get.data( lang, c(trait.name.1, trait.name.2), bin=TRUE, other=0, avg=TRUE, n_avg=5 )
+          
+          lang.C <- lang.data.0$C
+          save( lang.C, file=file.name.C )
+          
+          traits.bin <- lang.data.0$traits
+          lang.names[[i]] <- lang.data$l.names
+          lang.N[[i]] <- lang.data$N
+        } else { # avoid redundant recalculating of C
+          feats <-read.feats( lang, bin=TRUE, other=0 )
+          trait.1 <- as.numeric( unlist(feats[trait.name.1]) )
+          trait.2 <- as.numeric( unlist(feats[trait.name.2]) )
+          traits.bin <- c(trait.1, trait.2)
+          l.names <- as.character( feats$X )
+          assertthat::are_equal(l.names, lang.names[[i]])
+        }
+        
+        N <- lang.data$N
+        
+        # -- save dat --
+        dat <- list(
+          N = lang.N[[i]],
+          x = traits.bin,
+          M = length(lang.C),
+          dMat = designMatrix(lang.N[[i]], 2),
+          # Hyperparameters
+          eta = 0.8,
+          lambda = 1,
+          mu_z = 0,
+          sigma_z = 1.5
+        )
+        
+        file.name.dat <- file.path( paste(data.name, "binom-0_dat.RData", sep="_") )
+        save( dat, file=file.path(save.dir, file.name.dat) )
+        
+        remove( dat )
+        gc(verbose=FALSE)
+      }
+    }
+  }
+}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,199 @@
+---
+title: "avgVmultiC"
+output: html_document
+---
+
+```{r setup}
+library(ggplot2)
+library(ggpubr)
+setwd(dirname(getwd()))
+source('paths.R', encoding="utf8" )
+source( file.path(post.dir, 'diagnostics.R'), encoding="utf8" )
+```
+```{r read Uto-Aztecan bayes factors}
+load( file.path(post.dir, "rDats", "Uto-Aztecan_avgC-1_0_bfdf.RData") )
+load( file.path(post.dir, "rDats", "Uto-Aztecan_avgC-5_0_bfdf.RData") )
+load( file.path(post.dir, "rDats", "Uto-Aztecan_multiC-100_0_bfdf.RData") )
+```
+
+```{r plot direct}
+lang <- "Uto-Aztecan"
+upper.1 <- bf.df.UA.1.0[bf.df.UA.1.0$bayes.factors>=1,]
+lower.1 <- bf.df.UA.1.0[bf.df.UA.1.0$bayes.factors<1,]
+
+p.UA.avgC <- ggplot(bf.df.UA.1.0) + 
+  geom_col(data=upper.1, aes(x=trait.pairs, y=bayes.factors), fill="green4") +
+  geom_col(data=lower.1, aes(x=trait.pairs, y=bayes.factors), fill="blue4") + 
+  geom_hline(yintercept=1, color="red", size=1.2) +
+  geom_hline(yintercept=5, color="orange", size=1) +
+  scale_y_continuous(trans="log2", breaks=c(1, 1.5, 2, 5) ) +
+  coord_flip() + labs( title=paste(lang), subtitle=" - avgC-1" ) + 
+  theme(text = element_text(size=18)) + 
+  ylab("Bayes Factors") + xlab("trait pairs")
+
+#===================================
+upper.1 <- bf.df.UA.5.0[bf.df.UA.5.0$bayes.factors>=1,]
+lower.1 <- bf.df.UA.5.0[bf.df.UA.5.0$bayes.factors<1,]
+
+p.UA.avgC.5 <- ggplot(bf.df.UA.5.0) + 
+  geom_col(data=upper.1, aes(x=trait.pairs, y=bayes.factors), fill="green4") +
+  geom_col(data=lower.1, aes(x=trait.pairs, y=bayes.factors), fill="blue4") + 
+  geom_hline(yintercept=1, color="red", size=1.2) +
+  geom_hline(yintercept=5, color="orange", size=1) +
+  geom_hline(yintercept=1/5, color="orange", size=1) +
+  geom_hline(yintercept=100, color="yellow", size=1) +
+  scale_y_continuous(trans="log2", breaks=c(0.2, 1, 5, 100, 4000), labels=c("-5", "1", "5", "100", "4000") ) +
+  coord_flip() + labs( title="", subtitle=" - avgC-5" ) + 
+  theme(text = element_text(size = 18), axis.title.y=element_blank() ) +
+  ylab("Bayes Factors")
+
+#===================================
+upper.1 <- bf.df.UA.100.0[bf.df.UA.100.0$bayes.factors>=1,]
+lower.1 <- bf.df.UA.100.0[bf.df.UA.100.0$bayes.factors<1,]
+
+p.UA.multiC <- ggplot(bf.df.UA.100.0) + 
+  geom_col(data=upper.1, aes(x=trait.pairs, y=bayes.factors), fill="green4") +
+  geom_col(data=lower.1, aes(x=trait.pairs, y=bayes.factors), fill="blue4") + 
+  geom_hline(yintercept=1, color="red", size=1.2) +
+  geom_hline(yintercept=5, color="orange", size=1) +
+  geom_hline(yintercept=1/5, color="orange", size=1) +
+  geom_hline(yintercept=100, color="yellow", size=1) +
+  scale_y_continuous(trans="log2", breaks=c(0.2, 1, 5, 100, 4000), labels=c("-5", "1", "5", "100", "4000") ) +
+  coord_flip() + labs( title="", subtitle=" - multiC-100" ) + 
+  theme(text = element_text(size = 18), axis.title.y=element_blank() ) +
+  ylab("Bayes Factors")
+p.UA.avgC
+p.UA.avgC.5
+p.UA.multiC
+```
+
+```{r grid stuff, fig.height=6, fig.width=16}
+#Figure 7a:
+UA.grid <- ggarrange(p.UA.avgC, p.UA.avgC.5, p.UA.multiC,
+                   vjust=41, widths=c(1, 0.95, 0.95),
+                   nrow=1)
+UA.grid
+```
+
+```{r comparison df, paged.print=FALSE}
+bf.df.UA <- data.frame(row.names=bf.df.UA.1.0$trait.pairs)
+bf.df.UA$trait.pairs <- bf.df.UA.1.0$trait.pairs
+bf.df.UA$avgC.1 <- bf.df.UA.1.0$bayes.factors
+bf.df.UA$avgC.5 <- bf.df.UA.5.0$bayes.factors
+bf.df.UA$multiC.100 <- bf.df.UA.100.0$bayes.factors
+bf.df.UA
+```
+
+```{r scatter, fig.height=5, fig.width=20}
+p.UA.1.100 <- ggplot(bf.df.UA) + 
+  geom_abline(intercept=0, slope=1, color="grey", lwd=2) + 
+  geom_point(mapping=aes(x=avgC.1, y=multiC.100), color="black") +
+  geom_smooth(mapping=aes(x=avgC.1, y=multiC.100), method=lm, color="black", se=FALSE) +
+  theme(text = element_text(size = 18) )
+p.UA.1.100.log <- p.UA.1.100 + 
+  scale_x_continuous(trans="log2", name="avgC.1 - log2-transform") + 
+  scale_y_continuous(trans="log2", name="multiC.100 - log2-transform")
+p.UA.5.100 <- ggplot(bf.df.UA) + 
+  geom_abline(intercept=0, slope=1, color="grey", lwd=2) + 
+  geom_point(mapping=aes(x=avgC.5, y=multiC.100), color="black") +
+  geom_smooth(mapping=aes(x=avgC.5, y=multiC.100), method=lm, color="black", se=FALSE) +
+  theme(text = element_text(size = 18) )
+p.UA.5.100.log <- p.UA.5.100 + 
+  scale_x_continuous(trans="log2", name="avgC.5 - log2-transform") + 
+  scale_y_continuous(trans="log2", name="multiC.100 - log2-transform")
+
+#Figure 7b:
+ggarrange(p.UA.1.100, p.UA.1.100.log, p.UA.5.100, p.UA.5.100.log, ncol=4)
+```
+
+
+```{r r read Bantu bayes factors}
+load( file.path(post.dir, "rDats", "Bantu_avgC-1_0_bfdf.RData") )
+load( file.path(post.dir, "rDats", "Bantu_avgC-5_0_bfdf.RData") )
+load( file.path(post.dir, "rDats", "Bantu_multiC-100_0_bfdf.RData") )
+lang <- "Bantu"
+```
+
+```{r plot direct}
+upper.1 <- bf.df.BA.1.0[bf.df.BA.1.0$bayes.factors>=1,]
+lower.1 <- bf.df.BA.1.0[bf.df.BA.1.0$bayes.factors<1,]
+
+p.BA.avgC <- ggplot(bf.df.BA.1.0) + 
+  geom_col(data=upper.1, aes(x=trait.pairs, y=bayes.factors), fill="green4") +
+  geom_col(data=lower.1, aes(x=trait.pairs, y=bayes.factors), fill="blue4") + 
+  geom_hline(yintercept=1, color="red", size=1.2) +
+  scale_y_continuous(trans="log2", breaks=c(1/1.01, 1, 1.01), labels=c("-1.01", "1", "1.01") ) + 
+  theme(text = element_text(size = 18)) +
+  coord_flip() + labs( title=lang, subtitle=" - avgC-1" ) + 
+  ylab("Bayes Factors") + xlab("trait pairs")
+
+#===================================
+upper.1 <- bf.df.BA.5.0[bf.df.BA.5.0$bayes.factors>=1,]
+lower.1 <- bf.df.BA.5.0[bf.df.BA.5.0$bayes.factors<1,]
+
+p.BA.avgC.5 <- ggplot(bf.df.BA.5.0) + 
+  geom_col(data=upper.1, aes(x=trait.pairs, y=bayes.factors), fill="green4") +
+  geom_col(data=lower.1, aes(x=trait.pairs, y=bayes.factors), fill="blue4") + 
+  geom_hline(yintercept=1, color="red", size=1.2) +
+  geom_hline(yintercept=5, color="orange", size=1) +
+  scale_y_continuous(trans="log2", breaks=c(1, 2, 5), labels=c("1", "2", "5") ) +
+  theme(text = element_text(size = 18), axis.title.y=element_blank() ) +
+  coord_flip() + labs( title="", subtitle=" - avgC-5" ) + 
+  ylab("Bayes Factors")
+
+#===================================
+upper.1 <- bf.df.BA.100.0[bf.df.BA.100.0$bayes.factors>=1,]
+lower.1 <- bf.df.BA.100.0[bf.df.BA.100.0$bayes.factors<1,]
+
+p.BA.multiC <- ggplot(bf.df.BA.100.0) + 
+  geom_col(data=upper.1, aes(x=trait.pairs, y=bayes.factors), fill="green4") +
+  geom_col(data=lower.1, aes(x=trait.pairs, y=bayes.factors), fill="blue4") + 
+  geom_hline(yintercept=1, color="red", size=1.2) +
+  geom_hline(yintercept=5, color="orange", size=1) +
+  scale_y_continuous(trans="log2", breaks=c(1, 2, 5), labels=c("1", "2", "5") ) +
+  coord_flip() + labs( title="", subtitle=" - multiC-100" ) + 
+  theme(text = element_text(size = 18), axis.title.y=element_blank() ) +
+  ylab("Bayes Factors")
+p.BA.avgC
+p.BA.avgC.5
+p.BA.multiC
+```
+
+```{r grid stuff, fig.height=6, fig.width=16}
+# Figure 6a:
+BA.grid <- ggarrange(p.BA.avgC, p.BA.avgC.5, p.BA.multiC,
+                   vjust=41, widths=c(1, 0.95, 0.95),
+                   nrow=1)
+BA.grid
+```
+
+```{r comparison df, paged.print=FALSE}
+bf.df.BA <- data.frame(row.names=bf.df.BA.1.0$trait.pairs)
+bf.df.BA$trait.pairs <- bf.df.BA.1.0$trait.pairs
+bf.df.BA$avgC.1 <- bf.df.BA.1.0$bayes.factors
+bf.df.BA$avgC.5 <- bf.df.BA.5.0$bayes.factors
+bf.df.BA$multiC.100 <- bf.df.BA.100.0$bayes.factors
+bf.df.BA
+```
+
+```{r scatter, fig.height=5, fig.width=10}
+p.BA.1.100 <- ggplot(bf.df.BA) + 
+  geom_abline(intercept=0, slope=1, color="grey", lwd=2) + 
+  geom_point(mapping=aes(x=avgC.1, y=multiC.100), color="black") +
+  geom_smooth(mapping=aes(x=avgC.1, y=multiC.100), method=lm, color="black", se=FALSE) +
+  theme(text = element_text(size = 18) )
+p.BA.5.100 <- ggplot(bf.df.BA) + 
+  geom_abline(intercept=0, slope=1, color="grey", lwd=2) + 
+  geom_point(mapping=aes(x=avgC.5, y=multiC.100), color="black") +
+  geom_smooth(mapping=aes(x=avgC.5, y=multiC.100), method=lm, color="black", se=FALSE) +
+  theme(text = element_text(size = 18) )
+p.BA.5.100.log <- p.BA.5.100 + 
+  scale_x_continuous(trans="log2", name="avgC.5 - log2-transform") + 
+  scale_y_continuous(trans="log2", name="multiC.100 - log2-transform")
+
+# Figure 6b:
+ggarrange(p.BA.1.100, p.BA.5.100, 
+          #p.BA.5.100.log, ncol=3)
+          ncol=2)
+```
+
